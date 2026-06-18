@@ -7,10 +7,19 @@ struct WallpaperGridView: View {
     @EnvironmentObject private var model: AppModel
     let kind: WallpaperKind
     @State private var selectedID: UUID?
+    @State private var showGallery = false
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: 16)]
 
-    private var items: [WallpaperItem] { model.items.filter { $0.kind == kind } }
+    private var items: [WallpaperItem] {
+        switch kind {
+        case .web:   return model.items.filter { $0.kind == .web || $0.kind == .shader }
+        case .video: return model.items.filter { $0.kind == .video || $0.kind == .image }
+        default:     return model.items.filter { $0.kind == kind }
+        }
+    }
+
+    static let imageExtensions = ["png", "jpg", "jpeg", "heic", "heif", "gif", "tiff", "tif", "bmp", "webp"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +38,7 @@ struct WallpaperGridView: View {
             HStack(spacing: 10) { importControls; Spacer() }.padding(12)
         }
         .onAppear { selectedID = currentOrFirst }
+        .sheet(isPresented: $showGallery) { GalleryView() }
     }
 
     private var currentOrFirst: UUID? {
@@ -114,14 +124,21 @@ struct WallpaperGridView: View {
     @ViewBuilder private var importControls: some View {
         switch kind {
         case .video:
-            Button { addVideo() } label: { Label("Add Video…", systemImage: "plus") }
+            Button { addVideo() } label: { Label("Add Video or Image…", systemImage: "plus") }
         default:
-            Button { importLively() } label: { Label("Import Lively…", systemImage: "square.and.arrow.down") }
-            Button {
-                if let item = WallpaperItem.bundledWeb("particles", title: "Particles") {
-                    model.applyTransient(item)
+            Button { importLively() } label: { Label("Import…", systemImage: "square.and.arrow.down") }
+            Menu {
+                Button("Add Shadertoy URL…") { addShadertoy() }
+                Button("Built-in Shader") { addBuiltInShader() }
+                Button("Interactive Sample") {
+                    if let item = WallpaperItem.bundledWeb("particles", title: "Particles") {
+                        model.apply(item, addToLibrary: true); selectedID = item.id
+                    }
                 }
-            } label: { Label("Interactive Sample", systemImage: "sparkles") }
+            } label: { Label("Add", systemImage: "plus") }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            Button { showGallery = true } label: { Label("Gallery", systemImage: "square.grid.3x3.fill") }
         }
     }
 
@@ -129,13 +146,14 @@ struct WallpaperGridView: View {
 
     private func addVideo() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.movie, .mpeg4Movie, .quickTimeMovie]
+        panel.allowedContentTypes = [.movie, .mpeg4Movie, .quickTimeMovie, .image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.prompt = "Add"
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        let isImage = Self.imageExtensions.contains(url.pathExtension.lowercased())
         let item = WallpaperItem(title: url.deletingPathExtension().lastPathComponent,
-                                 kind: .video, contentURL: url)
+                                 kind: isImage ? .image : .video, contentURL: url)
         model.apply(item, addToLibrary: true)
         selectedID = item.id
     }
@@ -161,6 +179,29 @@ struct WallpaperGridView: View {
     private func remove(_ item: WallpaperItem) {
         if selectedID == item.id { selectedID = nil }
         model.remove(item)
+    }
+
+    private func addBuiltInShader() {
+        guard let item = WallpaperItem.bundledShader("plasma", title: "Plasma") else { return }
+        model.apply(item, addToLibrary: true)
+        selectedID = item.id
+    }
+
+    private func addShadertoy() {
+        let alert = NSAlert()
+        alert.messageText = "Add Shadertoy Wallpaper"
+        alert.informativeText = "Paste a Shadertoy URL (shadertoy.com/view/…) or shader id."
+        alert.addButton(withTitle: "Add")
+        alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.placeholderString = "https://www.shadertoy.com/view/…"
+        alert.accessoryView = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard let item = WallpaperItem.shadertoy(field.stringValue) else {
+            NSSound.beep(); return
+        }
+        model.apply(item, addToLibrary: true)
+        selectedID = item.id
     }
 }
 
@@ -238,7 +279,7 @@ struct WallpaperDetail: View {
                     Button("Remove", role: .destructive, action: onRemoved)
                 }
 
-                if item.kind == .video {
+                if item.kind == .video || item.kind == .image {
                     Divider()
                     Text("Fit").font(.headline)
                     VideoControlsView(item: item)

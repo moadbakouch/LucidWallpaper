@@ -28,6 +28,12 @@ protocol WallpaperRenderer: AnyObject {
     /// Cap the renderer's animation frame rate (0 = uncapped). Web renderers throttle
     /// requestAnimationFrame; others ignore it.
     func setFrameRateCap(_ fps: Int)
+
+    /// Lively data feeds (web renderers only): JSON for system info / now-playing, and a
+    /// normalized audio spectrum (128 bands).
+    func sendSystemInfo(_ json: String)
+    func sendNowPlaying(_ json: String)
+    func sendAudio(_ bands: [Float])
 }
 
 extension WallpaperRenderer {
@@ -36,6 +42,9 @@ extension WallpaperRenderer {
     func setProperty(_ name: String, value: LivelyValue) {}
     func applyVideoScaling(_ scaling: VideoScaling) {}
     func setFrameRateCap(_ fps: Int) {}
+    func sendSystemInfo(_ json: String) {}
+    func sendNowPlaying(_ json: String) {}
+    func sendAudio(_ bands: [Float]) {}
 
     /// Capture what this renderer currently shows. Default renders the view's layers;
     /// WebRenderer overrides with WKWebView.takeSnapshot. Needs no system permission

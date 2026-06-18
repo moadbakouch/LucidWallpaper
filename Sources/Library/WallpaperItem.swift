@@ -4,6 +4,7 @@ import Foundation
 enum WallpaperKind: String, Codable, Hashable {
     case video          // a looping video file (mp4/mov/m4v…)
     case web            // a local HTML/JS/WebGL wallpaper (entry = index.html)
+    case shader         // a Metal fragment shader (.metal `shade()` function)
     case test           // built-in animated gradient, used to validate the desktop window
     case image          // static image (future)
 }
@@ -60,5 +61,34 @@ struct WallpaperItem: Identifiable, Codable, Hashable {
             .appendingPathComponent("index.html")
         guard FileManager.default.fileExists(atPath: entry.path) else { return nil }
         return WallpaperItem(title: title, kind: .web, contentURL: entry)
+    }
+
+    /// A bundled Metal shader wallpaper (BundledWallpapers/shader/<name>.metal).
+    static func bundledShader(_ name: String, title: String) -> WallpaperItem? {
+        guard let resources = Bundle.main.resourceURL else { return nil }
+        let entry = resources
+            .appendingPathComponent("BundledWallpapers/shader", isDirectory: true)
+            .appendingPathComponent("\(name).metal")
+        guard FileManager.default.fileExists(atPath: entry.path) else { return nil }
+        return WallpaperItem(title: title, kind: .shader, contentURL: entry,
+                             desc: "Metal fragment shader")
+    }
+
+    /// A wallpaper from a Shadertoy URL or shader id (rendered as a web embed).
+    static func shadertoy(_ input: String) -> WallpaperItem? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Accept a full URL (…/view/<id>) or a bare id.
+        let id: String
+        if let range = trimmed.range(of: "shadertoy.com/view/") {
+            id = String(trimmed[range.upperBound...]).components(separatedBy: CharacterSet(charactersIn: "/?#")).first ?? ""
+        } else if trimmed.contains("/") || trimmed.contains(" ") {
+            return nil
+        } else {
+            id = trimmed
+        }
+        guard !id.isEmpty,
+              let url = URL(string: "https://www.shadertoy.com/embed/\(id)?gui=false&paused=false&muted=true") else { return nil }
+        return WallpaperItem(title: "Shadertoy \(id)", kind: .web, contentURL: url,
+                             desc: "Shadertoy shader (web embed)")
     }
 }

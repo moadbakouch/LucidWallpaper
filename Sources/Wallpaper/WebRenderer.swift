@@ -117,6 +117,22 @@ final class WebRenderer: NSObject, WallpaperRenderer {
         evaluate("if(window.__lucidwallpaperSetFPSCap){window.__lucidwallpaperSetFPSCap(\(fps));}")
     }
 
+    func sendSystemInfo(_ json: String) {
+        guard isLoaded else { return }
+        evaluate("if(window.livelySystemInformation){window.livelySystemInformation(\(json));}")
+    }
+
+    func sendNowPlaying(_ json: String) {
+        guard isLoaded else { return }
+        evaluate("if(window.livelyCurrentTrack){window.livelyCurrentTrack(\(json));}")
+    }
+
+    func sendAudio(_ bands: [Float]) {
+        guard isLoaded else { return }
+        let array = "[" + bands.map { String(format: "%.3f", $0) }.joined(separator: ",") + "]"
+        evaluate("if(window.livelyAudioListener){window.livelyAudioListener(\(array));}")
+    }
+
     /// Wraps requestAnimationFrame so the wallpaper can be throttled to a target FPS.
     private static let fpsCapShim = """
     (function(){

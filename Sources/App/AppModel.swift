@@ -25,17 +25,118 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(frameRateCapOnBattery, forKey: "frameRateCapOnBattery"); playback.frameRateCapOnBattery = frameRateCapOnBattery }
     }
 
+    // Rotation / playlist (off by default).
+    lazy var playlist = PlaylistController(model: self)
+    @Published var rotationEnabled = UserDefaults.standard.bool(forKey: "rotationEnabled") {
+        didSet { UserDefaults.standard.set(rotationEnabled, forKey: "rotationEnabled"); playlist.isEnabled = rotationEnabled }
+    }
+    @Published var rotationMinutes = AppModel.intPref("rotationMinutes", default: 10) {
+        didSet { UserDefaults.standard.set(rotationMinutes, forKey: "rotationMinutes"); playlist.intervalSeconds = TimeInterval(max(1, rotationMinutes) * 60) }
+    }
+    @Published var rotationShuffle = UserDefaults.standard.bool(forKey: "rotationShuffle") {
+        didSet { UserDefaults.standard.set(rotationShuffle, forKey: "rotationShuffle"); playlist.shuffle = rotationShuffle }
+    }
+
+    // Global hotkeys (⌃⌥⌘ + P / ] / [ / R). On by default; no permission needed.
+    let hotKeys = GlobalHotKeys()
+    @Published var globalHotkeysEnabled = AppModel.boolPref("globalHotkeysEnabled", default: true) {
+        didSet { UserDefaults.standard.set(globalHotkeysEnabled, forKey: "globalHotkeysEnabled"); applyHotkeys() }
+    }
+
+    private func applyHotkeys() {
+        hotKeys.unregisterAll()
+        if globalHotkeysEnabled { hotKeys.registerDefaults(model: self) }
+    }
+
+    // Scheduling (off by default): pick a day + night wallpaper.
+    lazy var scheduler = ScheduleController(model: self)
+    @Published var scheduleMode = UserDefaults.standard.string(forKey: "scheduleMode") ?? "off" {
+        didSet { UserDefaults.standard.set(scheduleMode, forKey: "scheduleMode"); reconfigureSchedule() }
+    }
+    @Published var dayWallpaperID: UUID? = AppModel.uuidPref("dayWallpaperID") {
+        didSet { UserDefaults.standard.set(dayWallpaperID?.uuidString, forKey: "dayWallpaperID"); reconfigureSchedule() }
+    }
+    @Published var nightWallpaperID: UUID? = AppModel.uuidPref("nightWallpaperID") {
+        didSet { UserDefaults.standard.set(nightWallpaperID?.uuidString, forKey: "nightWallpaperID"); reconfigureSchedule() }
+    }
+
+    private func reconfigureSchedule() {
+        scheduler.mode = ScheduleController.Mode(rawValue: scheduleMode) ?? .off
+        scheduler.dayItemID = dayWallpaperID
+        scheduler.nightItemID = nightWallpaperID
+        scheduler.reconfigure()
+    }
+
+    static func uuidPref(_ key: String) -> UUID? {
+        UserDefaults.standard.string(forKey: key).flatMap(UUID.init)
+    }
+
+    // Multi-monitor mode (persisted).
+    @Published var monitorMode: MonitorMode = MonitorMode(rawValue: UserDefaults.standard.string(forKey: "monitorMode") ?? "") ?? .mirror {
+        didSet { UserDefaults.standard.set(monitorMode.rawValue, forKey: "monitorMode"); windowManager.setMonitorMode(monitorMode) }
+    }
+
+    /// Assign a specific wallpaper to one display (Independent mode). Pass nil to clear.
+    func setDisplayWallpaper(_ item: WallpaperItem?, displayID: CGDirectDisplayID) {
+        if let item {
+            let assignment = WallpaperAssignment(item: item,
+                                                 properties: resolvedProperties(for: item),
+                                                 videoScaling: videoScaling(for: item))
+            windowManager.setAssignment(assignment, forDisplay: displayID)
+        } else {
+            windowManager.setAssignment(nil, forDisplay: displayID)
+        }
+    }
+
+    // System telemetry + now-playing feeds (on by default; only push to web wallpapers).
+    lazy var systemFeeders = SystemFeeders(manager: windowManager)
+    @Published var systemInfoEnabled = AppModel.boolPref("systemInfoEnabled", default: true) {
+        didSet { UserDefaults.standard.set(systemInfoEnabled, forKey: "systemInfoEnabled"); systemFeeders.systemInfoEnabled = systemInfoEnabled }
+    }
+    @Published var nowPlayingEnabled = AppModel.boolPref("nowPlayingEnabled", default: true) {
+        didSet { UserDefaults.standard.set(nowPlayingEnabled, forKey: "nowPlayingEnabled"); systemFeeders.nowPlayingEnabled = nowPlayingEnabled }
+    }
+
+    // Audio-reactive (off by default; needs mic permission).
+    lazy var audioFeeder = AudioFeeder(manager: windowManager)
+    @Published var audioReactiveEnabled = AppModel.boolPref("audioReactiveEnabled", default: false) {
+        didSet { UserDefaults.standard.set(audioReactiveEnabled, forKey: "audioReactiveEnabled"); audioFeeder.isEnabled = audioReactiveEnabled }
+    }
+
+    static func intPref(_ key: String, default def: Int) -> Int {
+        UserDefaults.standard.object(forKey: key) == nil ? def : UserDefaults.standard.integer(forKey: key)
+    }
+
+    static func boolPref(_ key: String, default def: Bool) -> Bool {
+        UserDefaults.standard.object(forKey: key) == nil ? def : UserDefaults.standard.bool(forKey: key)
+    }
+
     func start() {
+        windowManager.monitorMode = monitorMode
         windowManager.start()
         playback.pauseOnBattery = pauseOnBattery
         playback.pauseOnLowPowerMode = pauseOnLowPowerMode
         playback.frameRateCapOnBattery = frameRateCapOnBattery
         playback.start()
+        playlist.shuffle = rotationShuffle
+        playlist.intervalSeconds = TimeInterval(max(1, rotationMinutes) * 60)
+        playlist.isEnabled = rotationEnabled
+        applyHotkeys()
+        reconfigureSchedule()
+        systemFeeders.systemInfoEnabled = systemInfoEnabled
+        systemFeeders.nowPlayingEnabled = nowPlayingEnabled
+        systemFeeders.start()
+        if audioReactiveEnabled { audioFeeder.isEnabled = true }
         refresh()
     }
 
     func stop() {
         playback.stop()
+        playlist.stop()
+        scheduler.stop()
+        systemFeeders.stop()
+        audioFeeder.stop()
+        hotKeys.unregisterAll()
         windowManager.stop()
     }
 
@@ -45,12 +146,13 @@ final class AppModel: ObservableObject {
     // MARK: Applying wallpapers
 
     /// Apply a library wallpaper (persisted + selectable). Restores its saved properties.
-    func apply(_ item: WallpaperItem, addToLibrary: Bool) {
+    func apply(_ item: WallpaperItem, addToLibrary: Bool, crossfade: Bool = false) {
         if addToLibrary { library.add(item) }
         library.setCurrent(item)
         windowManager.apply(item,
                             properties: resolvedProperties(for: item),
-                            videoScaling: videoScaling(for: item))
+                            videoScaling: videoScaling(for: item),
+                            crossfade: crossfade)
         refresh()
     }
 
@@ -100,19 +202,19 @@ final class AppModel: ObservableObject {
     func togglePause() { setUserPaused(!isUserPaused) }
 
     /// Cycle the current wallpaper through the library (delta +1 next, -1 previous).
-    func cycleWallpaper(by delta: Int) {
+    func cycleWallpaper(by delta: Int, crossfade: Bool = true) {
         let items = library.items
         guard !items.isEmpty else { return }
         let index = items.firstIndex { $0.id == currentItemID } ?? (delta > 0 ? -1 : 0)
         let count = items.count
         let next = items[((index + delta) % count + count) % count]
-        apply(next, addToLibrary: false)
+        apply(next, addToLibrary: false, crossfade: crossfade)
     }
 
-    func randomWallpaper() {
+    func randomWallpaper(crossfade: Bool = true) {
         let others = library.items.filter { $0.id != currentItemID }
         guard let item = others.randomElement() ?? library.items.first else { return }
-        apply(item, addToLibrary: false)
+        apply(item, addToLibrary: false, crossfade: crossfade)
     }
 
     var canCycle: Bool { library.items.count > 1 }

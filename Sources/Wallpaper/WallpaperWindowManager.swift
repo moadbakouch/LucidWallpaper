@@ -8,6 +8,34 @@ enum PauseReason {
     case occluded    // wallpaper fully covered by a fullscreen/maximized app
 }
 
+/// How wallpapers map onto multiple displays.
+enum MonitorMode: String, CaseIterable, Identifiable {
+    case mirror        // same wallpaper on every display
+    case span          // one canvas stretched across all displays
+    case independent   // a (possibly) different wallpaper per display
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .mirror: return "Mirror"
+        case .span: return "Span"
+        case .independent: return "Independent"
+        }
+    }
+}
+
+/// A fully-resolved wallpaper assignment (content + its properties + scaling).
+struct WallpaperAssignment {
+    var item: WallpaperItem
+    var properties: [String: LivelyValue]
+    var videoScaling: VideoScaling
+}
+
+extension NSScreen {
+    var displayID: CGDirectDisplayID {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) ?? 0
+    }
+}
+
 /// Owns one wallpaper window + renderer per screen and keeps them in sync with the
 /// current display configuration. Rebuilds cleanly when displays connect/disconnect.
 @MainActor
@@ -23,6 +51,10 @@ final class WallpaperWindowManager {
     private var currentVideoScaling = VideoScaling.default
     private var currentFrameRateCap = 0
     private var pauseReasons: Set<PauseReason> = []
+
+    /// Multi-monitor configuration.
+    var monitorMode: MonitorMode = .mirror
+    private var perDisplay: [CGDirectDisplayID: WallpaperAssignment] = [:]
     /// Snapshot of the screen layout; used to ignore spurious screen-parameter notifications
     /// (creating our own windows can post one, which would otherwise loop into a rebuild).
     private var screenSignature = ""
@@ -72,12 +104,17 @@ final class WallpaperWindowManager {
 
     func apply(_ item: WallpaperItem,
                properties: [String: LivelyValue] = [:],
-               videoScaling: VideoScaling = .default) {
+               videoScaling: VideoScaling = .default,
+               crossfade doFade: Bool = false) {
         currentItem = item
         currentProperties = properties
         currentVideoScaling = videoScaling
         pauseReasons.remove(.occluded)
-        rebuild()
+        if doFade && !entries.isEmpty {
+            crossfade()
+        } else {
+            rebuild()
+        }
     }
 
     func clear() {
@@ -103,6 +140,29 @@ final class WallpaperWindowManager {
         currentFrameRateCap = fps
         for entry in entries { entry.renderer?.setFrameRateCap(fps) }
     }
+
+    /// True if any current renderer is a web wallpaper (the only consumer of data feeds).
+    var hasWebRenderer: Bool { entries.contains { $0.renderer is WebRenderer } }
+
+    func setMonitorMode(_ mode: MonitorMode) {
+        guard mode != monitorMode else { return }
+        monitorMode = mode
+        rebuild()
+    }
+
+    func setAssignment(_ assignment: WallpaperAssignment?, forDisplay id: CGDirectDisplayID) {
+        perDisplay[id] = assignment
+        rebuild()
+    }
+
+    func clearPerDisplay() {
+        perDisplay.removeAll()
+        rebuild()
+    }
+
+    func sendSystemInfo(_ json: String) { for entry in entries { entry.renderer?.sendSystemInfo(json) } }
+    func sendNowPlaying(_ json: String) { for entry in entries { entry.renderer?.sendNowPlaying(json) } }
+    func sendAudio(_ bands: [Float]) { for entry in entries { entry.renderer?.sendAudio(bands) } }
 
     /// Snapshot the first screen's wallpaper (for demos/verification).
     func snapshotCurrent(_ completion: @escaping (NSImage?) -> Void) {
@@ -144,56 +204,108 @@ final class WallpaperWindowManager {
     // MARK: Building
 
     private func teardown() {
-        for entry in entries {
+        teardownEntries(entries)
+        entries.removeAll()
+    }
+
+    private func teardownEntries(_ list: [ScreenWallpaper]) {
+        for entry in list {
             entry.renderer?.stop()
             entry.window.orderOut(nil)
             entry.window.close()
         }
-        entries.removeAll()
     }
 
     private func rebuild() {
         teardown()
         screenSignature = Self.signature(of: NSScreen.screens)
+        entries = makeEntries()
+        for entry in entries { entry.window.orderFront(nil) }
+    }
+
+    /// Fade in a fresh set of windows over the existing ones, then remove the old.
+    private func crossfade() {
+        let old = entries
+        screenSignature = Self.signature(of: NSScreen.screens)
+        let fresh = makeEntries()
+        for entry in fresh {
+            entry.window.alphaValue = 0
+            entry.window.orderFront(nil)
+        }
+        entries = fresh
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.6
+            for entry in fresh { entry.window.animator().alphaValue = 1 }
+            for entry in old { entry.window.animator().alphaValue = 0 }
+        }, completionHandler: { [weak self] in
+            self?.teardownEntries(old)
+        })
+    }
+
+    private var primaryAssignment: WallpaperAssignment? {
+        currentItem.map { WallpaperAssignment(item: $0, properties: currentProperties, videoScaling: currentVideoScaling) }
+    }
+
+    private func assignment(for screen: NSScreen) -> WallpaperAssignment? {
+        if monitorMode == .independent { return perDisplay[screen.displayID] ?? primaryAssignment }
+        return primaryAssignment
+    }
+
+    private func makeEntries() -> [ScreenWallpaper] {
+        if monitorMode == .span { return makeSpanEntries() }
+        var result: [ScreenWallpaper] = []
         for screen in NSScreen.screens {
             let window = WallpaperWindow(screen: screen)
-            let renderer = makeRenderer(for: currentItem)
-
-            if let renderer, let content = window.contentView {
-                let v = renderer.view
-                v.frame = content.bounds
-                v.autoresizingMask = [.width, .height]
-                content.addSubview(v)
-                if let item = currentItem {
-                    renderer.load(item)
-                    renderer.setProperties(currentProperties)
-                    renderer.applyVideoScaling(currentVideoScaling)
-                    renderer.setFrameRateCap(currentFrameRateCap)
-                    if isPaused { renderer.pause() }
-                }
+            let assignment = self.assignment(for: screen)
+            let renderer = makeRenderer(for: assignment?.item)
+            if let renderer, let assignment, let content = window.contentView {
+                attach(renderer, assignment: assignment, to: content)
             }
-
-            window.orderFront(nil)
-            entries.append(ScreenWallpaper(window: window, renderer: renderer))
+            result.append(ScreenWallpaper(window: window, renderer: renderer))
 
             #if DEBUG
-            let desktopLevel = Int(CGWindowLevelForKey(.desktopWindow))
-            NSLog("[LucidWallpaper] window screen=%@ frame=%@ level=%d (desktop=%d) renderer=%@",
+            NSLog("[LucidWallpaper] window screen=%@ frame=%@ renderer=%@ mode=%@",
                   "\(NSScreen.screens.firstIndex(of: screen) ?? -1)",
                   NSStringFromRect(window.frame),
-                  window.level.rawValue, desktopLevel,
-                  renderer.map { String(describing: type(of: $0)) } ?? "none")
+                  renderer.map { String(describing: type(of: $0)) } ?? "none", monitorMode.rawValue)
             #endif
         }
+        return result
+    }
+
+    /// One window stretched across the union of all displays.
+    private func makeSpanEntries() -> [ScreenWallpaper] {
+        guard let assignment = primaryAssignment else { return [] }
+        var union = NSScreen.screens.first?.frame ?? .zero
+        for screen in NSScreen.screens { union = union.union(screen.frame) }
+        let window = WallpaperWindow(frame: union)
+        let renderer = makeRenderer(for: assignment.item)
+        if let renderer, let content = window.contentView {
+            attach(renderer, assignment: assignment, to: content)
+        }
+        return [ScreenWallpaper(window: window, renderer: renderer)]
+    }
+
+    private func attach(_ renderer: WallpaperRenderer, assignment: WallpaperAssignment, to content: NSView) {
+        let v = renderer.view
+        v.frame = content.bounds
+        v.autoresizingMask = [.width, .height]
+        content.addSubview(v)
+        renderer.load(assignment.item)
+        renderer.setProperties(assignment.properties)
+        renderer.applyVideoScaling(assignment.videoScaling)
+        renderer.setFrameRateCap(currentFrameRateCap)
+        if isPaused { renderer.pause() }
     }
 
     private func makeRenderer(for item: WallpaperItem?) -> WallpaperRenderer? {
         guard let item else { return nil }
         switch item.kind {
-        case .video: return VideoRenderer()
-        case .web:   return WebRenderer()
-        case .test:  return TestPatternRenderer()
-        case .image: return nil
+        case .video:  return VideoRenderer()
+        case .web:    return WebRenderer()
+        case .shader: return MetalRenderer()
+        case .image:  return ImageRenderer()
+        case .test:   return TestPatternRenderer()
         }
     }
 }

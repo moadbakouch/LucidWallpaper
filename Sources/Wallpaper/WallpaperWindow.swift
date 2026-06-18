@@ -4,8 +4,12 @@ import AppKit
 /// desktop icons but above the static system wallpaper. This is the core technique that
 /// makes content read as a "live wallpaper".
 final class WallpaperWindow: NSWindow {
-    init(screen: NSScreen) {
-        super.init(contentRect: screen.frame,
+    convenience init(screen: NSScreen) {
+        self.init(frame: screen.frame)
+    }
+
+    init(frame: NSRect) {
+        super.init(contentRect: frame,
                    styleMask: .borderless,
                    backing: .buffered,
                    defer: false)
@@ -24,12 +28,12 @@ final class WallpaperWindow: NSWindow {
         isReleasedWhenClosed = false
         animationBehavior = .none
 
-        let content = LayerHostView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        let content = LayerHostView(frame: NSRect(origin: .zero, size: frame.size))
         content.wantsLayer = true
         content.layerContentsRedrawPolicy = .duringViewResize
         contentView = content
 
-        setFrame(screen.frame, display: true)
+        setFrame(frame, display: true)
     }
 
     override var canBecomeKey: Bool { false }

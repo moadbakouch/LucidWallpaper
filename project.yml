@@ -48,3 +48,32 @@ targets:
       - name: Strip extended attributes before signing
         basedOnDependencyAnalysis: false
         script: /usr/bin/xattr -cr "$CODESIGNING_FOLDER_PATH" || true
+
+  # Companion screensaver (.saver). Built with its own scheme; not a dependency of the app.
+  LucidWallpaperSaver:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: Saver
+        excludes:
+          - "Info.plist"
+    settings:
+      base:
+        PRODUCT_NAME: LucidWallpaperSaver
+        PRODUCT_BUNDLE_IDENTIFIER: com.lucidwallpaper.saver
+        INFOPLIST_FILE: Saver/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        WRAPPER_EXTENSION: saver
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/../Frameworks"
+          - "@loader_path/../Frameworks"
+    dependencies:
+      - sdk: ScreenSaver.framework
+      - sdk: AVFoundation.framework
+      - sdk: WebKit.framework
+    postBuildScripts:
+      - name: Strip extended attributes before signing
+        basedOnDependencyAnalysis: false
+        script: /usr/bin/xattr -cr "$CODESIGNING_FOLDER_PATH" || true

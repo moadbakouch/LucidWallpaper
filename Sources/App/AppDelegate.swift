@@ -103,6 +103,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let item = WallpaperItem.bundledWeb("particles", title: "Particles") {
                 model.applyTransient(item)
             }
+        } else if value == "shader" {
+            if let item = WallpaperItem.bundledShader("plasma", title: "Plasma") {
+                model.applyTransient(item)
+            }
         } else if value.hasPrefix("lively:") {
             let path = String(value.dropFirst("lively:".count))
             try? model.importLively(at: URL(fileURLWithPath: path))
@@ -121,7 +125,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSLog("[LucidWallpaper] added video '%@' to library", item.title)
         } else {
             let url = URL(fileURLWithPath: value)
-            let kind: WallpaperKind = url.pathExtension.lowercased() == "html" ? .web : .video
+            let ext = url.pathExtension.lowercased()
+            let imageExts = ["png", "jpg", "jpeg", "heic", "heif", "gif", "tiff", "bmp", "webp"]
+            let kind: WallpaperKind
+            if ext == "html" || ext == "htm" { kind = .web }
+            else if ext == "metal" { kind = .shader }
+            else if imageExts.contains(ext) { kind = .image }
+            else { kind = .video }
             model.applyTransient(WallpaperItem(title: url.lastPathComponent, kind: kind, contentURL: url))
             // Debug: LUCIDWALL_VIDEO_SCALE=fill|fit|stretch (+ LUCIDWALL_VIDEO_ZOOM) to verify scaling.
             if kind == .video,

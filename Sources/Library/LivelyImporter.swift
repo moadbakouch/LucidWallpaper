@@ -9,9 +9,9 @@ enum ImportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noManifest:
-            return "No LivelyInfo.json found in the package."
+            return "No LivelyInfo.json or project.json found in the package."
         case .unsupportedType(let t):
-            return "This wallpaper type (\(t)) isn't supported yet. LucidWallpaper currently supports video and web wallpapers."
+            return "This wallpaper type (\(t)) isn't supported. LucidWallpaper supports video and web wallpapers."
         case .extractionFailed(let code):
             return "Failed to extract the .zip archive (ditto exit \(code))."
         case .missingEntryFile(let name):
@@ -20,14 +20,20 @@ enum ImportError: LocalizedError {
     }
 }
 
-/// Imports a Lively Wallpaper package (a `.zip` or an already-unzipped folder containing
-/// `LivelyInfo.json`) into LucidWallpaper's library, copying it under Application Support and
-/// returning a ready-to-apply `WallpaperItem`.
+/// A Wallpaper Engine `project.json` manifest (subset).
+private struct WallpaperEngineProject: Codable {
+    var title: String?
+    var type: String?      // "video" | "web" | "scene" | "application"
+    var file: String?
+    var preview: String?
+}
+
+/// Imports a Lively (`LivelyInfo.json`) or Wallpaper Engine (`project.json`) package — a
+/// `.zip` or an unzipped folder — into the library, copying it under Application Support.
 enum LivelyImporter {
     static func importPackage(at source: URL) throws -> WallpaperItem {
         let fm = FileManager.default
 
-        // 1. Get a directory that contains LivelyInfo.json (extracting first if it's a zip).
         let packageRoot: URL
         var scratch: URL?
         if source.pathExtension.lowercased() == "zip" {
@@ -40,50 +46,103 @@ enum LivelyImporter {
         }
         defer { if let scratch { try? fm.removeItem(at: scratch) } }
 
-        // 2. Parse the manifest.
+        if fm.fileExists(atPath: packageRoot.appendingPathComponent("LivelyInfo.json").path) {
+            return try importLively(from: packageRoot)
+        } else if fm.fileExists(atPath: packageRoot.appendingPathComponent("project.json").path) {
+            return try importWallpaperEngine(from: packageRoot)
+        }
+        throw ImportError.noManifest
+    }
+
+    // MARK: Lively
+
+    private static func importLively(from packageRoot: URL) throws -> WallpaperItem {
+        let fm = FileManager.default
         let manifestURL = packageRoot.appendingPathComponent("LivelyInfo.json")
         let info = try JSONDecoder().decode(LivelyInfo.self, from: Data(contentsOf: manifestURL))
 
         guard let entryName = info.fileName, !entryName.isEmpty else {
             throw ImportError.missingEntryFile("(unspecified)")
         }
-        let kind = try inferKind(info: info, entryName: entryName)
+        let kind = try inferLivelyKind(info: info, entryName: entryName)
 
-        // 3. Copy the whole package into the library under a fresh id.
         let id = UUID()
-        let dest = AppPaths.library.appendingPathComponent(id.uuidString, isDirectory: true)
-        try? fm.removeItem(at: dest)
-        try fm.copyItem(at: packageRoot, to: dest)
+        let dest = try copyPackage(packageRoot, id: id)
 
-        let entryURL = dest.appendingPathComponent(entryName)
-        // For remote `url`-type wallpapers the entry is an http(s) address, not a file.
         let contentURL: URL
         if let remote = remoteURL(from: entryName) {
             contentURL = remote
         } else {
-            guard fm.fileExists(atPath: entryURL.path) else {
-                throw ImportError.missingEntryFile(entryName)
-            }
+            let entryURL = dest.appendingPathComponent(entryName)
+            guard fm.fileExists(atPath: entryURL.path) else { throw ImportError.missingEntryFile(entryName) }
             contentURL = entryURL
         }
 
         let thumb = info.thumbnail.map { dest.appendingPathComponent($0) }
         let props = dest.appendingPathComponent("LivelyProperties.json")
-        let propsURL = fm.fileExists(atPath: props.path) ? props : nil
 
         return WallpaperItem(
             id: id,
             title: info.title ?? packageRoot.lastPathComponent,
             kind: kind,
             contentURL: contentURL,
-            thumbnailURL: (thumb.flatMap { fm.fileExists(atPath: $0.path) ? $0 : nil }),
+            thumbnailURL: existing(thumb),
             author: info.author,
             desc: info.desc,
             arguments: info.arguments,
-            propertiesURL: propsURL)
+            propertiesURL: fm.fileExists(atPath: props.path) ? props : nil)
     }
 
-    // MARK: Helpers
+    // MARK: Wallpaper Engine
+
+    private static func importWallpaperEngine(from packageRoot: URL) throws -> WallpaperItem {
+        let fm = FileManager.default
+        let manifestURL = packageRoot.appendingPathComponent("project.json")
+        let project = try JSONDecoder().decode(WallpaperEngineProject.self, from: Data(contentsOf: manifestURL))
+
+        guard let file = project.file, !file.isEmpty else { throw ImportError.missingEntryFile("(unspecified)") }
+        let kind = try inferWEKind(type: project.type, file: file)
+
+        let id = UUID()
+        let dest = try copyPackage(packageRoot, id: id)
+        let entryURL = dest.appendingPathComponent(file)
+        guard fm.fileExists(atPath: entryURL.path) else { throw ImportError.missingEntryFile(file) }
+
+        let thumb = project.preview.map { dest.appendingPathComponent($0) }
+        return WallpaperItem(
+            id: id,
+            title: project.title ?? packageRoot.lastPathComponent,
+            kind: kind,
+            contentURL: entryURL,
+            thumbnailURL: existing(thumb),
+            desc: "Imported from Wallpaper Engine")
+    }
+
+    private static func inferWEKind(type: String?, file: String) throws -> WallpaperKind {
+        let ext = (file as NSString).pathExtension.lowercased()
+        switch (type ?? "").lowercased() {
+        case "video": return .video
+        case "web": return .web
+        default:
+            if ["mp4", "webm", "mov", "m4v"].contains(ext) { return .video }
+            if ["html", "htm"].contains(ext) { return .web }
+            throw ImportError.unsupportedType("Wallpaper Engine “\(type ?? ext)” (scene/app packages aren’t supported)")
+        }
+    }
+
+    // MARK: Shared helpers
+
+    private static func copyPackage(_ packageRoot: URL, id: UUID) throws -> URL {
+        let dest = AppPaths.library.appendingPathComponent(id.uuidString, isDirectory: true)
+        try? FileManager.default.removeItem(at: dest)
+        try FileManager.default.copyItem(at: packageRoot, to: dest)
+        return dest
+    }
+
+    private static func existing(_ url: URL?) -> URL? {
+        guard let url, FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return url
+    }
 
     private static func extractZip(_ zip: URL, to dest: URL) throws {
         try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
@@ -95,17 +154,16 @@ enum LivelyImporter {
         guard p.terminationStatus == 0 else { throw ImportError.extractionFailed(p.terminationStatus) }
     }
 
-    /// Locate the directory holding LivelyInfo.json (root or one level down, as macOS zip
-    /// tools often wrap contents in a top folder).
+    /// Locate a directory holding a supported manifest (root or one level down).
     private static func findManifestDirectory(in root: URL) throws -> URL {
         let fm = FileManager.default
-        if fm.fileExists(atPath: root.appendingPathComponent("LivelyInfo.json").path) {
+        let manifests = ["LivelyInfo.json", "project.json"]
+        if manifests.contains(where: { fm.fileExists(atPath: root.appendingPathComponent($0).path) }) {
             return root
         }
         let entries = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
-        for entry in entries {
-            let manifest = entry.appendingPathComponent("LivelyInfo.json")
-            if fm.fileExists(atPath: manifest.path) { return entry }
+        for entry in entries where manifests.contains(where: { fm.fileExists(atPath: entry.appendingPathComponent($0).path) }) {
+            return entry
         }
         throw ImportError.noManifest
     }
@@ -116,19 +174,15 @@ enum LivelyImporter {
         return url
     }
 
-    /// Route to a renderer kind. Prefer the entry-file extension (robust across Lively
-    /// versions), falling back to the manifest's numeric Type.
-    private static func inferKind(info: LivelyInfo, entryName: String) throws -> WallpaperKind {
+    private static func inferLivelyKind(info: LivelyInfo, entryName: String) throws -> WallpaperKind {
         if remoteURL(from: entryName) != nil { return .web }
         let ext = (entryName as NSString).pathExtension.lowercased()
         if ["html", "htm"].contains(ext) { return .web }
         if ["mp4", "mov", "m4v", "webm", "mkv", "avi", "wmv"].contains(ext) { return .video }
-
         switch info.type {
-        case 1, 2, 3: return .web        // web, webaudio, url
-        case 6, 9: return .video         // video, videostream
-        default:
-            throw ImportError.unsupportedType(info.type.map(String.init) ?? "ext .\(ext)")
+        case 1, 2, 3: return .web
+        case 6, 9: return .video
+        default: throw ImportError.unsupportedType(info.type.map(String.init) ?? "ext .\(ext)")
         }
     }
 }

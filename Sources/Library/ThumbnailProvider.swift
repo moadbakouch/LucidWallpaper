@@ -39,6 +39,7 @@ enum ThumbnailProvider {
         switch item.kind {
         case .video: return await videoFrame(item.contentURL)
         case .web:   return await WebThumbnailRenderer.snapshot(item)
+        case .image: return NSImage(contentsOf: item.contentURL)
         default:     return nil
         }
     }
