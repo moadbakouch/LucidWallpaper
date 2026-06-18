@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LiveWall — Particles</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05060a; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(function () {
+  "use strict";
+
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d", { alpha: false });
+
+  let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const mouse = { x: -9999, y: -9999, active: false };
+
+  // ---- Lively-compatible JS API (so this also serves as a bridge reference) ----
+  // Native code calls these; we keep them tolerant of being called before init.
+  let paused = false;
+  let settings = { count: 140, hue: 210, link: 130, repel: 1 };
+
+  window.livelyPropertyListener = function (name, val) {
+    if (name in settings) settings[name] = val;
+    if (name === "count") seed(settings.count);
+  };
+  window.livelyWallpaperPlaybackChanged = function (isPaused) { paused = !!isPaused; };
+  window.livelyAudioListener = function (/* float[128] */) { /* reserved for M-later */ };
+
+  // ---- Input ----
+  // The native layer dispatches DOM mousemove events at the real cursor position,
+  // so a standard listener is all we need (works for unmodified Lively wallpapers too).
+  document.addEventListener("mousemove", function (e) {
+    mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+  });
+
+  // ---- Particles ----
+  let particles = [];
+  function seed(n) {
+    particles = [];
+    for (let i = 0; i < n; i++) {
+      particles.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+      });
+    }
+  }
+
+  function resize() {
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (particles.length === 0) seed(settings.count);
+  }
+  window.addEventListener("resize", resize);
+
+  function step() {
+    requestAnimationFrame(step);
+    if (paused) return;
+
+    ctx.fillStyle = "#05060a";
+    ctx.fillRect(0, 0, W, H);
+
+    const link = settings.link;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+
+      // Mouse interaction: gentle attraction with close-range repulsion.
+      if (mouse.active) {
+        const dx = mouse.x - p.x, dy = mouse.y - p.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < 240 * 240) {
+          const d = Math.sqrt(d2) || 1;
+          const force = (1 - d / 240) * 0.6 * settings.repel;
+          p.vx += (dx / d) * (d < 90 ? -force * 1.8 : force) * 0.15;
+          p.vy += (dy / d) * (d < 90 ? -force * 1.8 : force) * 0.15;
+        }
+      }
+
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.99; p.vy *= 0.99;
+
+      // Wrap around edges.
+      if (p.x < 0) p.x += W; else if (p.x > W) p.x -= W;
+      if (p.y < 0) p.y += H; else if (p.y > H) p.y -= H;
+
+      // Links to nearby particles.
+      for (let j = i + 1; j < particles.length; j++) {
+        const q = particles[j];
+        const dx = p.x - q.x, dy = p.y - q.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < link * link) {
+          const a = 1 - Math.sqrt(d2) / link;
+          ctx.strokeStyle = "hsla(" + settings.hue + ",80%,65%," + (a * 0.5).toFixed(3) + ")";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(q.x, q.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Nodes on top.
+    ctx.fillStyle = "hsl(" + settings.hue + ",90%,72%)";
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  resize();
+  step();
+})();
+</script>
+</body>
+</html>

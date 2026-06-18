@@ -1,0 +1,50 @@
+name: LucidWallpaper
+options:
+  bundleIdPrefix: com.lucidwallpaper
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: YES
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_IDENTITY: "-"          # ad-hoc signing for local development
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: NO       # enabled only for notarized release builds (M8)
+
+targets:
+  LucidWallpaper:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
+      # Folder reference: copied verbatim into Contents/Resources/BundledWallpapers,
+      # preserving each wallpaper's directory layout (index.html + assets).
+      - path: BundledWallpapers
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_NAME: LucidWallpaper
+        PRODUCT_BUNDLE_IDENTIFIER: com.lucidwallpaper.app
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Resources/LucidWallpaper.entitlements
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/../Frameworks"
+    postBuildScripts:
+      # iCloud Documents sync stamps files with com.apple.FinderInfo / fileprovider
+      # xattrs that make codesign fail ("resource fork … not allowed"). Strip them from
+      # the bundle right before Xcode's implicit signing step.
+      - name: Strip extended attributes before signing
+        basedOnDependencyAnalysis: false
+        script: /usr/bin/xattr -cr "$CODESIGNING_FOLDER_PATH" || true

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- v1 ships outside the Mac App Store: no sandbox, Hardened Runtime added at release time. -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<!-- Needed by web wallpapers that load remote resources (Three.js CDNs, Shadertoy, etc.). -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

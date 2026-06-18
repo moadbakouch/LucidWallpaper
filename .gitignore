@@ -1,0 +1,18 @@
+# Generated Xcode project (regenerate with `xcodegen generate`)
+*.xcodeproj/
+
+# Build output
+build/
+build-release/
+dist/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# macOS
+.DS_Store
+
+# Editor / local
+*.swp
+.vscode/
+.idea/
