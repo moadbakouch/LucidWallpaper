@@ -8,7 +8,7 @@ struct WallpaperGridView: View {
     let kind: WallpaperKind
     @State private var selectedID: UUID?
 
-    private let columns = [GridItem(.adaptive(minimum: 172), spacing: 18)]
+    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: 16)]
 
     private var items: [WallpaperItem] { model.items.filter { $0.kind == kind } }
 
@@ -19,13 +19,14 @@ struct WallpaperGridView: View {
             if items.isEmpty {
                 emptyState
             } else {
-                HSplitView {
-                    grid.frame(minWidth: 320)
-                    detail.frame(minWidth: 260)
+                HStack(spacing: 0) {
+                    grid.frame(maxWidth: .infinity)
+                    Divider()
+                    detail.frame(width: 320)
                 }
             }
             Divider()
-            HStack { importControls; Spacer() }.padding(10)
+            HStack(spacing: 10) { importControls; Spacer() }.padding(12)
         }
         .onAppear { selectedID = currentOrFirst }
     }
@@ -169,24 +170,26 @@ struct WallpaperCell: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            ThumbnailView(item: item)
+        VStack(alignment: .leading, spacing: 6) {
+            // Color.clear drives a reliable 16:10 box; the thumbnail fills + is clipped to it.
+            Color.clear
                 .aspectRatio(16.0 / 10.0, contentMode: .fit)
-                .overlay(
+                .overlay { ThumbnailView(item: item) }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay {
                     RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(isSelected ? Color.accentColor : Color.black.opacity(0.12),
+                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12),
                                       lineWidth: isSelected ? 2.5 : 1)
-                )
+                }
                 .overlay(alignment: .topTrailing) {
                     if isCurrent {
                         Image(systemName: "checkmark.circle.fill")
                             .symbolRenderingMode(.palette)
                             .foregroundStyle(.white, .green)
-                            .padding(6)
+                            .padding(5)
                             .shadow(radius: 1)
                     }
                 }
-                .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
 
             Text(item.title)
                 .font(.callout)
@@ -207,10 +210,11 @@ struct WallpaperDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                ThumbnailView(item: item)
+                Color.clear
                     .aspectRatio(16.0 / 10.0, contentMode: .fit)
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.black.opacity(0.12)))
-                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                    .overlay { ThumbnailView(item: item) }
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(.primary.opacity(0.12)) }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.title).font(.title3.bold())

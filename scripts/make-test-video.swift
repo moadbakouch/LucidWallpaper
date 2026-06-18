@@ -45,7 +45,9 @@ input.requestMediaDataWhenReady(on: DispatchQueue(label: "gen")) {
                             space: CGColorSpaceCreateDeviceRGB(),
                             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue)!
         let t = CGFloat(frame) / CGFloat(total)
-        ctx.setFillColor(NSColor(hue: t, saturation: 0.7, brightness: 0.85, alpha: 1).cgColor)
+        let hueBase = CommandLine.arguments.count > 4 ? (CGFloat(Double(CommandLine.arguments[4]) ?? 0)) : 0
+        let hue = (t + hueBase).truncatingRemainder(dividingBy: 1.0)
+        ctx.setFillColor(NSColor(hue: hue, saturation: 0.7, brightness: 0.85, alpha: 1).cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
         ctx.setFillColor(NSColor.white.withAlphaComponent(0.9).cgColor)
         let cx = CGFloat(W) * (0.5 + 0.4 * sin(t * .pi * 2))
