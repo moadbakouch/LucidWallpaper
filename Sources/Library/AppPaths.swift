@@ -20,4 +20,11 @@ enum AppPaths {
     static var libraryIndex: URL {
         support.appendingPathComponent("library.json")
     }
+
+    /// Cached preview images, named by item UUID.
+    static var thumbnails: URL {
+        let dir = support.appendingPathComponent("Thumbnails", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
 }

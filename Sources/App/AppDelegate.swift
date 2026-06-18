@@ -4,11 +4,12 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private var statusBar: StatusBarController!
-    private var settingsWindow: SettingsWindowController!
+    var settingsWindow: SettingsWindowController!
     let mouseMonitor = GlobalMouseMonitor()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.start()
+        setupMainMenu()
         settingsWindow = SettingsWindowController(model: model)
         statusBar = StatusBarController(model: model, openSettings: { [weak self] in
             self?.settingsWindow.show()
@@ -42,6 +43,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let path = ProcessInfo.processInfo.environment["LUCIDWALL_SNAPSHOT"] {
             scheduleSnapshot(to: path)
+        }
+
+        if ProcessInfo.processInfo.environment["LUCIDWALL_GEN_THUMBS"] != nil {
+            Task { @MainActor in
+                for item in model.items { _ = await ThumbnailProvider.image(for: item) }
+                NSLog("[LucidWallpaper] thumbnails generated for %d items", model.items.count)
+            }
         }
     }
 

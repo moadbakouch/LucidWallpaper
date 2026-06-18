@@ -102,26 +102,33 @@ struct GeneralView: View {
     }
 }
 
-/// Thumbnail (from the package) or a kind-appropriate placeholder.
+/// A real preview of the wallpaper (video frame / web snapshot / package thumbnail),
+/// loaded asynchronously and cached, with a kind-appropriate placeholder while loading.
 struct ThumbnailView: View {
     let item: WallpaperItem
+    @State private var image: NSImage?
 
     var body: some View {
-        Group {
-            if let url = item.thumbnailURL, let image = NSImage(contentsOf: url) {
+        ZStack {
+            LinearGradient(colors: [Color(nsColor: .windowBackgroundColor),
+                                    Color(nsColor: .underPageBackgroundColor)],
+                           startPoint: .top, endPoint: .bottom)
+            if let image {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .transition(.opacity)
             } else {
-                ZStack {
-                    Rectangle().fill(.quaternary)
-                    Image(systemName: placeholderIcon)
-                        .font(.system(size: 28))
-                        .foregroundStyle(.secondary)
-                }
+                Image(systemName: placeholderIcon)
+                    .font(.system(size: 26))
+                    .foregroundStyle(.secondary)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .task(id: item.id) {
+            let loaded = await ThumbnailProvider.image(for: item)
+            withAnimation(.easeOut(duration: 0.2)) { image = loaded }
+        }
     }
 
     private var placeholderIcon: String {

@@ -85,6 +85,7 @@ final class AppModel: ObservableObject {
     func remove(_ item: WallpaperItem) {
         let wasCurrent = library.currentItemID == item.id
         library.remove(item)
+        ThumbnailProvider.invalidate(item.id)
         if wasCurrent { windowManager.clear() }
         refresh()
     }
@@ -95,6 +96,26 @@ final class AppModel: ObservableObject {
         isUserPaused = paused
         windowManager.setPaused(paused, reason: .user)
     }
+
+    func togglePause() { setUserPaused(!isUserPaused) }
+
+    /// Cycle the current wallpaper through the library (delta +1 next, -1 previous).
+    func cycleWallpaper(by delta: Int) {
+        let items = library.items
+        guard !items.isEmpty else { return }
+        let index = items.firstIndex { $0.id == currentItemID } ?? (delta > 0 ? -1 : 0)
+        let count = items.count
+        let next = items[((index + delta) % count + count) % count]
+        apply(next, addToLibrary: false)
+    }
+
+    func randomWallpaper() {
+        let others = library.items.filter { $0.id != currentItemID }
+        guard let item = others.randomElement() ?? library.items.first else { return }
+        apply(item, addToLibrary: false)
+    }
+
+    var canCycle: Bool { library.items.count > 1 }
 
     var launchAtLogin: Bool {
         get { LaunchAtLogin.isEnabled }

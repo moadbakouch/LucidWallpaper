@@ -57,6 +57,12 @@ mouse events (clicks fall through to the desktop); interactivity comes from a gl
 - **Drag-and-drop** a `.zip` / Lively folder / video onto the window to add it.
 - Build output now lives in `~/Library/Caches/LucidWallpaperBuild*` (outside iCloud) so codesign is reliable.
 
+### v0.3 additions
+- **Real wallpaper previews** — video frame (AVAssetImageGenerator), offscreen WebKit snapshot (with Lively property defaults applied), or the package's thumbnail; cached to disk + memory.
+- **Polished library layout** — consistent 16:10 preview tiles, selection ring, current-wallpaper badge, double-click to apply.
+- **Native top menu bar** — App (About, Settings ⌘,), File (Import/Add Video), Edit, **Playback** (Pause ⌘P, Next ⌘], Previous ⌘[, Random ⌘R), and Window menus when the control window is open.
+- **Status-bar quick actions** — Pause/Resume, Next/Previous/Random wallpaper with shortcuts, in the menu-bar dropdown.
+
 ### Package a release
 
 ```sh

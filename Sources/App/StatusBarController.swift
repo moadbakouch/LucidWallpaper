@@ -53,8 +53,14 @@ final class StatusBarController: NSObject {
 
         menu.addItem(.separator())
 
-        let pause = addItem(to: menu, title: model.isUserPaused ? "Resume" : "Pause", action: #selector(togglePause))
+        let pause = addItem(to: menu, title: model.isUserPaused ? "Resume" : "Pause", action: #selector(togglePause), key: "p")
         pause.isEnabled = model.hasWallpaper
+        let next = addItem(to: menu, title: "Next Wallpaper", action: #selector(nextWallpaper), key: "]")
+        next.isEnabled = model.canCycle
+        let prev = addItem(to: menu, title: "Previous Wallpaper", action: #selector(previousWallpaper), key: "[")
+        prev.isEnabled = model.canCycle
+        let rand = addItem(to: menu, title: "Random Wallpaper", action: #selector(randomWallpaper), key: "r")
+        rand.isEnabled = model.items.count > 1
         addItem(to: menu, title: "Remove Wallpaper", action: #selector(removeWallpaper))
 
         menu.addItem(.separator())
@@ -120,6 +126,10 @@ final class StatusBarController: NSObject {
     @objc private func togglePause() {
         model.setUserPaused(!model.isUserPaused)
     }
+
+    @objc private func nextWallpaper() { model.cycleWallpaper(by: 1) }
+    @objc private func previousWallpaper() { model.cycleWallpaper(by: -1) }
+    @objc private func randomWallpaper() { model.randomWallpaper() }
 
     @objc private func removeWallpaper() {
         model.clear()

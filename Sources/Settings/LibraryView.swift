@@ -8,7 +8,7 @@ struct WallpaperGridView: View {
     let kind: WallpaperKind
     @State private var selectedID: UUID?
 
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 172), spacing: 18)]
 
     private var items: [WallpaperItem] { model.items.filter { $0.kind == kind } }
 
@@ -57,19 +57,22 @@ struct WallpaperGridView: View {
 
     private var grid: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
+            LazyVGrid(columns: columns, spacing: 18) {
                 ForEach(items) { item in
                     WallpaperCell(item: item,
                                   isCurrent: model.currentItemID == item.id,
                                   isSelected: selectedID == item.id)
                         .onTapGesture { selectedID = item.id }
+                        .simultaneousGesture(TapGesture(count: 2).onEnded {
+                            model.apply(item, addToLibrary: false)
+                        })
                         .contextMenu {
                             Button("Apply") { model.apply(item, addToLibrary: false) }
                             Button("Remove", role: .destructive) { remove(item) }
                         }
                 }
             }
-            .padding()
+            .padding(18)
         }
     }
 
@@ -166,29 +169,32 @@ struct WallpaperCell: View {
     let isSelected: Bool
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             ThumbnailView(item: item)
-                .frame(height: 90)
-                .overlay(alignment: .bottomLeading) {
-                    Image(systemName: item.kind == .video ? "film" : "globe")
-                        .font(.caption2)
-                        .padding(4)
-                        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 5))
-                        .foregroundStyle(.white)
-                        .padding(5)
+                .aspectRatio(16.0 / 10.0, contentMode: .fit)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(isSelected ? Color.accentColor : Color.black.opacity(0.12),
+                                      lineWidth: isSelected ? 2.5 : 1)
+                )
+                .overlay(alignment: .topTrailing) {
+                    if isCurrent {
+                        Image(systemName: "checkmark.circle.fill")
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .green)
+                            .padding(6)
+                            .shadow(radius: 1)
+                    }
                 }
-            Text(item.title).font(.caption).lineLimit(1)
+                .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+
+            Text(item.title)
+                .font(.callout)
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? Color.accentColor : .primary)
+                .padding(.horizontal, 2)
         }
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 10)
-            .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear))
-        .overlay(alignment: .topTrailing) {
-            if isCurrent {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.white, .green)
-                    .padding(6)
-            }
-        }
+        .padding(6)
         .contentShape(Rectangle())
     }
 }
@@ -200,23 +206,30 @@ struct WallpaperDetail: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 16) {
                 ThumbnailView(item: item)
-                    .frame(height: 150)
-                    .frame(maxWidth: .infinity)
+                    .aspectRatio(16.0 / 10.0, contentMode: .fit)
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.black.opacity(0.12)))
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
 
-                Text(item.title).font(.title3).bold()
-                if let author = item.author {
-                    Text("by \(author)").font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title).font(.title3.bold())
+                    if let author = item.author {
+                        Text("by \(author)").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 if let desc = item.desc, !desc.isEmpty {
-                    Text(desc).font(.callout)
+                    Text(desc).font(.callout).foregroundStyle(.secondary)
                 }
 
-                HStack {
-                    Button(model.currentItemID == item.id ? "Applied" : "Apply") {
+                HStack(spacing: 8) {
+                    Button {
                         model.apply(item, addToLibrary: false)
+                    } label: {
+                        Label(model.currentItemID == item.id ? "Applied" : "Apply",
+                              systemImage: model.currentItemID == item.id ? "checkmark" : "play.fill")
                     }
+                    .buttonStyle(.borderedProminent)
                     .disabled(model.currentItemID == item.id)
                     Button("Remove", role: .destructive, action: onRemoved)
                 }
@@ -233,8 +246,9 @@ struct WallpaperDetail: View {
                         PropertyControlsView(item: item, entries: entries)
                     }
                 }
+                Spacer(minLength: 0)
             }
-            .padding()
+            .padding(18)
         }
     }
 }
