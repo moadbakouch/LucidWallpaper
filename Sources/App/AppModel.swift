@@ -270,6 +270,8 @@ final class AppModel: ObservableObject {
 
     /// Set by AppDelegate to show the command palette (bound to the ⌃⌥⌘Space hotkey).
     var requestCommandPalette: (() -> Void)?
+    /// Set by AppDelegate to show the in-app feedback form.
+    var requestFeedback: (() -> Void)?
 
     // Ambient audio + per-Space wallpapers.
     let audio = AudioController()

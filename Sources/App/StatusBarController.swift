@@ -152,7 +152,7 @@ final class StatusBarController: NSObject {
         model.launchAtLogin.toggle()
     }
 
-    @objc private func sendFeedback() { Feedback.submit() }
+    @objc private func sendFeedback() { model.requestFeedback?() }
     @objc private func checkUpdates() { model.checkForUpdates() }
 
     @objc private func quit() {

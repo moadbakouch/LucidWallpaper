@@ -86,7 +86,7 @@ extension AppDelegate {
     // MARK: Actions
 
     @objc func showSettings(_ sender: Any?) { model.settingsTab = "settings"; openSettingsWindow() }
-    @objc func sendFeedbackAction(_ sender: Any?) { Feedback.submit() }
+    @objc func sendFeedbackAction(_ sender: Any?) { model.requestFeedback?() }
     @objc func showAbout(_ sender: Any?) { NSApp.orderFrontStandardAboutPanel(sender) }
     @objc func togglePauseAction(_ sender: Any?) { model.togglePause() }
     @objc func nextWallpaperAction(_ sender: Any?) { model.cycleWallpaper(by: 1) }

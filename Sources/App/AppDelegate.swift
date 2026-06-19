@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: SettingsWindowController!
     private var onboarding: OnboardingWindowController?
     private var commandPalette: CommandPaletteController?
+    private var feedbackWindow: FeedbackWindowController?
     private var featureTest: FeatureSelfTest?
     private var stressTimer: Timer?
     private var stressRemaining = 0
@@ -22,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let palette = CommandPaletteController(model: model)
         commandPalette = palette
         model.requestCommandPalette = { [weak palette] in palette?.toggle() }
+
+        let feedback = FeedbackWindowController(model: model)
+        feedbackWindow = feedback
+        model.requestFeedback = { [weak feedback] in feedback?.show() }
 
         // The global cursor feed into mouse-follow / parallax wallpapers is owned by AppModel,
         // which only enables it for interactive (web/shader) wallpapers.
@@ -80,6 +85,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             RunLoop.main.add(t, forMode: .common)
             stressTimer = t
+        }
+
+        if ProcessInfo.processInfo.environment["LUCIDWALL_SHOW_FEEDBACK"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.model.requestFeedback?() }
+        }
+
+        if ProcessInfo.processInfo.environment["LUCIDWALL_FEEDBACK_TEST"] != nil, Feedback.endpoint != nil {
+            Task { @MainActor in
+                let report = Feedback.makeReport(category: "Bug", message: "Automated test report from the harness.",
+                                                 email: "tester@example.com", wallpaper: model.currentItem?.title ?? "(none)")
+                let outcome = await Feedback.send(report)
+                NSLog("[FEEDBACKTEST] outcome=%@", "\(outcome)")
+                NSApp.terminate(nil)
+            }
         }
     }
 
