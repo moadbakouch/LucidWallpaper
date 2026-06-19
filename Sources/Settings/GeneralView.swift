@@ -412,7 +412,10 @@ struct GeneralView: View {
     }
 
     private var aboutSection: some View {
-        Section {
+        Section("About") {
+            Button { Feedback.submit() } label: { Label("Send Feedback…", systemImage: "envelope") }
+            Text("Found a bug or have an idea? We'd love to hear it.")
+                .font(.footnote).foregroundStyle(.secondary)
             Text("LucidWallpaper \(appVersion)").font(.footnote).foregroundStyle(.secondary)
         }
     }

@@ -11,6 +11,7 @@ extension AppDelegate {
         // App menu (titled automatically with the app name).
         let appMenu = NSMenu()
         addAppItem(appMenu, "About LucidWallpaper", #selector(showAbout(_:)))
+        addAppItem(appMenu, "Send Feedback…", #selector(sendFeedbackAction(_:)))
         appMenu.addItem(.separator())
         addAppItem(appMenu, "Settings…", #selector(showSettings(_:)), ",")
         appMenu.addItem(.separator())
@@ -85,6 +86,7 @@ extension AppDelegate {
     // MARK: Actions
 
     @objc func showSettings(_ sender: Any?) { model.settingsTab = "settings"; openSettingsWindow() }
+    @objc func sendFeedbackAction(_ sender: Any?) { Feedback.submit() }
     @objc func showAbout(_ sender: Any?) { NSApp.orderFrontStandardAboutPanel(sender) }
     @objc func togglePauseAction(_ sender: Any?) { model.togglePause() }
     @objc func nextWallpaperAction(_ sender: Any?) { model.cycleWallpaper(by: 1) }

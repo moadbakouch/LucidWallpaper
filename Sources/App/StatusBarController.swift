@@ -77,6 +77,7 @@ final class StatusBarController: NSObject {
         launch.state = model.launchAtLogin ? .on : .off
 
         menu.addItem(.separator())
+        addItem(to: menu, title: "Send Feedback…", action: #selector(sendFeedback))
         addItem(to: menu, title: "Check for Updates…", action: #selector(checkUpdates))
         addItem(to: menu, title: "Quit LucidWallpaper", action: #selector(quit), key: "q")
     }
@@ -151,6 +152,7 @@ final class StatusBarController: NSObject {
         model.launchAtLogin.toggle()
     }
 
+    @objc private func sendFeedback() { Feedback.submit() }
     @objc private func checkUpdates() { model.checkForUpdates() }
 
     @objc private func quit() {
