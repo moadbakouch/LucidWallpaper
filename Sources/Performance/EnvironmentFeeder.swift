@@ -93,11 +93,19 @@ final class EnvironmentFeeder {
 
     private func themePayload() -> [String: Any] {
         let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let accent = (NSColor.controlAccentColor.usingColorSpace(.sRGB)) ?? .systemBlue
-        let hex = String(format: "#%02X%02X%02X",
+        // Must convert to an RGB colorspace before reading components - reading red/green/blue
+        // on a catalog/named color (e.g. a non-converted systemBlue) raises an NSException.
+        let accent = NSColor.controlAccentColor.usingColorSpace(.sRGB)
+            ?? NSColor.systemBlue.usingColorSpace(.sRGB)
+        let hex: String
+        if let accent {
+            hex = String(format: "#%02X%02X%02X",
                          Int(round(accent.redComponent * 255)),
                          Int(round(accent.greenComponent * 255)),
                          Int(round(accent.blueComponent * 255)))
+        } else {
+            hex = "#0A84FF"
+        }
         return ["isDark": dark, "accent": hex]
     }
 

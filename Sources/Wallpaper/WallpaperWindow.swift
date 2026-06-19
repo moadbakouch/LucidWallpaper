@@ -43,10 +43,15 @@ final class WallpaperWindow: NSWindow {
         setFrame(frame, display: true)
     }
 
-    /// A black overlay above the wallpaper used for the global "dim" and idle dimming.
+    /// A black overlay above the wallpaper used for the global "dim".
     let dimView = NSView()
 
-    func setDim(_ level: CGFloat) { dimView.animator().alphaValue = max(0, min(0.92, level)) }
+    /// Set the dim level. `animated: false` is used when building fresh windows during a
+    /// crossfade so the incoming wallpaper isn't briefly under-dimmed (a visible flash).
+    func setDim(_ level: CGFloat, animated: Bool = true) {
+        let clamped = max(0, min(0.92, level))
+        if animated { dimView.animator().alphaValue = clamped } else { dimView.alphaValue = clamped }
+    }
 
     /// Keep the dim layer on top after the renderer view is attached.
     func bringDimToFront() {

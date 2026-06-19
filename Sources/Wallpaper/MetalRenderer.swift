@@ -209,6 +209,8 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         } catch {
             NSLog("[LucidWallpaper] shader compile failed: %@", "\(error)")
             pipeline = nil
+            // Fall back to the built-in shader so a bad import shows something, not a black screen.
+            if shade != Self.defaultShade { buildPipeline(shade: Self.defaultShade) }
         }
     }
 

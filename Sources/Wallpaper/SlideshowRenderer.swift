@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 
 /// Photo-slideshow wallpaper: slowly pans/zooms across each image (a "Ken Burns" effect)
 /// and crossfades to the next on a timer. `contentURL` points at a folder of images.
@@ -65,33 +66,57 @@ final class SlideshowRenderer: NSObject, WallpaperRenderer {
     }
 
     private func showFirst() {
-        guard let img = nextImage() else { return }
+        guard !images.isEmpty else { return }
+        let url = images[index % images.count]; index += 1
         let front = showingA ? layerA : layerB
-        front.contents = img
-        front.opacity = 1
-        kenBurns(front)
-    }
-
-    private func nextImage() -> NSImage? {
-        guard !images.isEmpty else { return nil }
-        let url = images[index % images.count]
-        index += 1
-        return NSImage(contentsOf: url)
+        loadImage(url) { [weak self] cg in
+            guard let self, let cg else { return }
+            front.contents = cg
+            front.opacity = 1
+            self.kenBurns(front)
+        }
     }
 
     private func advance() {
-        guard !paused, let img = nextImage() else { return }
+        guard !paused, !images.isEmpty else { return }
+        let url = images[index % images.count]; index += 1
         let incoming = showingA ? layerB : layerA
         let outgoing = showingA ? layerA : layerB
-        incoming.contents = img
-        incoming.opacity = 0
-        kenBurns(incoming)
-        CATransaction.begin()
-        CATransaction.setAnimationDuration(fade)
-        incoming.opacity = 1
-        outgoing.opacity = 0
-        CATransaction.commit()
         showingA.toggle()
+        loadImage(url) { [weak self] cg in
+            guard let self, let cg else { return }
+            incoming.contents = cg
+            incoming.opacity = 0
+            self.kenBurns(incoming)
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(self.fade)
+            incoming.opacity = 1
+            outgoing.opacity = 0
+            CATransaction.commit()
+        }
+    }
+
+    /// Decode + downsample off the main thread (large photos would otherwise stall the UI),
+    /// then deliver the CGImage back on the main actor.
+    private func loadImage(_ url: URL, _ apply: @escaping (CGImage?) -> Void) {
+        let scale = host.window?.backingScaleFactor ?? 2
+        let longest = max(host.bounds.width, host.bounds.height) * scale * 1.2
+        let maxPixel = max(640, Int(longest.isFinite && longest > 0 ? longest : 2048))
+        Task.detached(priority: .utility) {
+            let cg = Self.downsample(url, maxPixel: maxPixel)
+            await MainActor.run { apply(cg) }
+        }
+    }
+
+    nonisolated private static func downsample(_ url: URL, maxPixel: Int) -> CGImage? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
     }
 
     /// A slow zoom + drift over the photo's lifetime.

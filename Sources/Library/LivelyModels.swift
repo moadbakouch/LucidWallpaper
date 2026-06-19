@@ -64,8 +64,11 @@ enum LivelyValue: Codable, Hashable {
                 .replacingOccurrences(of: "\"", with: "\\\"")
             return "\"\(escaped)\""
         case .number(let d):
-            // Emit integers without a trailing .0 so wallpapers comparing === ints behave.
-            return d == d.rounded() ? String(Int(d)) : String(d)
+            guard d.isFinite else { return "0" }
+            // Emit whole numbers without a trailing .0 so wallpapers comparing === ints behave.
+            // Guard the Int range - a huge value (e.g. 1e300 from a crafted package) traps Int(d).
+            if d == d.rounded(), abs(d) < 9_007_199_254_740_992 { return String(Int(d)) }
+            return String(d)
         case .bool(let b):
             return b ? "true" : "false"
         }

@@ -79,15 +79,11 @@ final class WallpaperWindowManager {
     /// Throttle for global cursor delivery - parallax wallpapers don't need sub-30 ms updates,
     /// and each web update is a `evaluateJavaScript`, so coalescing cuts CPU during mouse moves.
     private var lastMouseDispatch: CFTimeInterval = 0
-    /// Dim overlay: `baseDim` is the user's master dim; `idleDim` is applied when idle. The
-    /// stronger of the two wins.
+    /// The user's master dim level applied as a black overlay over every wallpaper.
     private var baseDim: CGFloat = 0
-    private var idleDim: CGFloat = 0
-    private var effectiveDim: CGFloat { max(baseDim, idleDim) }
 
     func setBaseDim(_ level: CGFloat) { baseDim = level; applyDim() }
-    func setIdleDim(_ level: CGFloat) { idleDim = level; applyDim() }
-    private func applyDim() { for entry in entries { entry.window.setDim(effectiveDim) } }
+    private func applyDim() { for entry in entries { entry.window.setDim(baseDim) } }
 
     /// Debug: dim overlay alpha on the first window (-1 if none); used by the feature test.
     var debugFirstDimAlpha: CGFloat { entries.first?.window.dimView.alphaValue ?? -1 }
@@ -342,7 +338,12 @@ final class WallpaperWindowManager {
             recomputeOcclusion()
             updatePlayback()
         }
+        onPauseChanged?(globalPaused)   // let AppModel pause/resume ambient audio with the wallpaper
     }
+
+    /// Fired whenever the global pause state flips (any reason). Used to keep ambient audio in
+    /// sync with the wallpaper so sound stops during calls / idle / lock, not just user pause.
+    var onPauseChanged: ((Bool) -> Void)?
 
     /// Reconcile each display's renderer with the desired state: a renderer runs only when
     /// nothing globally paused it AND its own window is on-screen (not covered by an app).
@@ -395,10 +396,13 @@ final class WallpaperWindowManager {
         teardown()
         screenSignature = Self.signature(of: NSScreen.screens)
         entries = makeEntries()
-        for entry in entries { entry.window.bringDimToFront(); entry.window.orderFront(nil) }
+        for entry in entries {
+            entry.window.bringDimToFront()
+            entry.window.setDim(baseDim, animated: false)   // no fade-in flash on fresh windows
+            entry.window.orderFront(nil)
+        }
         updatePlayback()
         recomputeOcclusion()   // a wallpaper applied behind a maximized app starts paused
-        applyDim()
     }
 
     /// Old entries currently fading out during a crossfade; torn down when the fade completes.
@@ -412,12 +416,12 @@ final class WallpaperWindowManager {
         for entry in fresh {
             entry.window.alphaValue = 0
             entry.window.bringDimToFront()
+            entry.window.setDim(baseDim, animated: false)   // no fade-in flash on fresh windows
             entry.window.orderFront(nil)
         }
         entries = fresh
         updatePlayback()
         recomputeOcclusion()
-        applyDim()
         // Hold the outgoing entries on `self` so the (@Sendable) completion handler doesn't
         // capture a non-Sendable array; it only needs to trigger the main-actor teardown.
         fadingOut.append(contentsOf: old)

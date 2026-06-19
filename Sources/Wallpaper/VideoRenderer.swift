@@ -72,7 +72,9 @@ final class VideoRenderer: NSObject, WallpaperRenderer {
         playerLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         playerLayer.bounds = CGRect(origin: .zero, size: host.bounds.size)
         playerLayer.position = CGPoint(x: host.bounds.midX, y: host.bounds.midY)
-        let z = max(1.0, scaling.zoom)
+        // Clamp to the documented 1.0...2.0 range; a corrupt/infinite persisted zoom would
+        // otherwise collapse the layer to nothing.
+        let z = scaling.zoom.isFinite ? min(2.0, max(1.0, scaling.zoom)) : 1.0
         playerLayer.transform = CATransform3DMakeScale(z, z, 1)
         CATransaction.commit()
     }

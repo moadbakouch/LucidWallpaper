@@ -103,6 +103,12 @@ final class FeatureSelfTest {
     private func checkAudioThenPlaylist() {
         let playing = model.audio.debugIsPlaying
         record("audio", playing, "isPlaying=\(playing)")
+        // Audio must follow the global pause (not only user pause): pause -> silent, resume -> plays.
+        model.setUserPaused(true)
+        let silenced = !model.audio.debugIsPlaying
+        model.setUserPaused(false)
+        let resumed = model.audio.debugIsPlaying
+        record("audio-pause", silenced && resumed, "silenced=\(silenced) resumed=\(resumed)")
         if let item = model.currentItem { model.setSound(nil, for: item) }
         model.audioVolume = 0
         testPlaylist()

@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboarding: OnboardingWindowController?
     private var commandPalette: CommandPaletteController?
     private var featureTest: FeatureSelfTest?
+    private var stressTimer: Timer?
+    private var stressRemaining = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.start()
@@ -67,6 +69,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             featureTest = test
             test.run()
         }
+
+        // Leak/stress check: rapidly crossfade through the library, then quit. Sample RSS
+        // externally to detect growth from leaked windows/renderers.
+        if let s = ProcessInfo.processInfo.environment["LUCIDWALL_STRESS"], let n = Int(s) {
+            stressRemaining = n
+            NSLog("[STRESS] start cycles=%d items=%d", n, model.items.count)
+            let t = Timer(timeInterval: 0.3, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.stressTick() }
+            }
+            RunLoop.main.add(t, forMode: .common)
+            stressTimer = t
+        }
+    }
+
+    private func stressTick() {
+        if stressRemaining <= 0 {
+            stressTimer?.invalidate(); stressTimer = nil
+            NSLog("[STRESS] done"); NSApp.terminate(nil); return
+        }
+        stressRemaining -= 1
+        model.cycleWallpaper(by: 1, crossfade: true)
     }
 
     /// Debug: drive a synthetic cursor (to show mouse reactivity), then write a PNG of the

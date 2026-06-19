@@ -148,9 +148,10 @@ final class AppModel: ObservableObject {
     /// Run an automated apply (rotation/schedule) without it overwriting the per-Space
     /// wallpaper the user chose for the current Space.
     func suppressingPerSpaceRecording(_ body: () -> Void) {
+        let prev = perSpace.suppressRecording
         perSpace.suppressRecording = true
+        defer { perSpace.suppressRecording = prev }
         body()
-        perSpace.suppressRecording = false
     }
 
     // MARK: AI shader generation
@@ -288,7 +289,7 @@ final class AppModel: ObservableObject {
     func soundURL(for item: WallpaperItem) -> URL? { library.soundURL(for: item.id) }
 
     private func updateAudio() {
-        guard audioVolume > 0, !isUserPaused, let item = library.currentItem,
+        guard audioVolume > 0, !windowManager.isPaused, let item = library.currentItem,
               let url = library.soundURL(for: item.id), FileManager.default.fileExists(atPath: url.path) else {
             audio.setSound(nil); return
         }
@@ -342,6 +343,7 @@ final class AppModel: ObservableObject {
         idle.thresholdMinutes = idleMinutes; idle.enabled = pauseWhenIdle; idle.start()
         windowManager.setBaseDim(CGFloat(wallpaperDim))
         audio.volume = audioVolume
+        windowManager.onPauseChanged = { [weak self] paused in self?.handleGlobalPause(paused) }
         perSpace.model = self; perSpace.enabled = perSpaceEnabled; perSpace.start()
         cloud.enabled = iCloudSyncEnabled
         if autoCheckUpdates { UpdateChecker.check(manual: false) }
@@ -361,8 +363,10 @@ final class AppModel: ObservableObject {
         idle.stop()
         audio.stop()
         perSpace.stop()
+        cloud.enabled = false   // remove the iCloud KVS observer (deactivate)
         mouseMonitor.stop()
         hotKeys.unregisterAll()
+        windowManager.onPauseChanged = nil
         windowManager.stop()
     }
 
@@ -462,7 +466,13 @@ final class AppModel: ObservableObject {
     func setUserPaused(_ paused: Bool) {
         isUserPaused = paused
         windowManager.setPaused(paused, reason: .user)
-        paused ? audio.suspend() : audio.resume()
+        // Audio follows the manager's global pause via onPauseChanged, so it also stops for
+        // occlusion / idle / meeting / lock - not only user pause.
+    }
+
+    /// Keep ambient audio in sync with the wallpaper's global pause state.
+    private func handleGlobalPause(_ paused: Bool) {
+        if paused { audio.suspend() } else { audio.resume(); updateAudio() }
     }
 
     func togglePause() { setUserPaused(!isUserPaused) }

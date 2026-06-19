@@ -44,6 +44,9 @@ final class PlaybackController {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), batterySource, .defaultMode)
         }
         batterySource = nil
+        // Clear our reasons so they don't linger (symmetric with the activity watchers).
+        manager.setPaused(false, reason: .system)
+        manager.setPaused(false, reason: .battery)
     }
 
     // MARK: System signals
