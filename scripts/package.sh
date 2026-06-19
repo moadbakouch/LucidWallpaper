@@ -38,7 +38,7 @@ if [ -n "$DEVELOPER_ID_APP" ]; then
     --entitlements Resources/LucidWallpaper.entitlements \
     --sign "$DEVELOPER_ID_APP" "$PRODUCT"
 else
-  echo "==> No DEVELOPER_ID_APP set — ad-hoc signing."
+  echo "==> No DEVELOPER_ID_APP set - ad-hoc signing."
   echo "    (Runs locally; other Macs will show a Gatekeeper warning until notarized.)"
   codesign --force --sign - "$PRODUCT"
 fi

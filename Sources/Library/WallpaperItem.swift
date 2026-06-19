@@ -3,10 +3,12 @@ import Foundation
 /// The kinds of wallpaper content LucidWallpaper can render.
 enum WallpaperKind: String, Codable, Hashable {
     case video          // a looping video file (mp4/mov/m4v…)
-    case web            // a local HTML/JS/WebGL wallpaper (entry = index.html)
+    case web            // a local HTML/JS/WebGL wallpaper, OR a remote web page URL
     case shader         // a Metal fragment shader (.metal `shade()` function)
     case test           // built-in animated gradient, used to validate the desktop window
-    case image          // static image (future)
+    case image          // static image
+    case gif            // animated GIF / APNG
+    case slideshow      // a folder of photos, pan/zoomed with crossfades (contentURL = folder)
 }
 
 /// A single wallpaper the user can apply. For Lively packages, `contentURL` points at
@@ -72,6 +74,22 @@ struct WallpaperItem: Identifiable, Codable, Hashable {
         guard FileManager.default.fileExists(atPath: entry.path) else { return nil }
         return WallpaperItem(title: title, kind: .shader, contentURL: entry,
                              desc: "Metal fragment shader")
+    }
+
+    /// A live web page used as a wallpaper (any http/https URL).
+    static func webPage(_ input: String) -> WallpaperItem? {
+        var s = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty else { return nil }
+        if !s.lowercased().hasPrefix("http://") && !s.lowercased().hasPrefix("https://") { s = "https://" + s }
+        guard let url = URL(string: s), url.host != nil else { return nil }
+        let title = url.host?.replacingOccurrences(of: "www.", with: "") ?? "Web Page"
+        return WallpaperItem(title: title, kind: .web, contentURL: url, desc: "Live web page")
+    }
+
+    /// A photo-folder slideshow wallpaper (Ken Burns pan/zoom + crossfades).
+    static func slideshow(folder url: URL) -> WallpaperItem {
+        WallpaperItem(title: url.lastPathComponent.isEmpty ? "Slideshow" : url.lastPathComponent,
+                      kind: .slideshow, contentURL: url, desc: "Photo slideshow")
     }
 
     /// A wallpaper from a Shadertoy URL or shader id (rendered as a web embed).

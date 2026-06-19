@@ -1,0 +1,6 @@
+{
+  "weatherEffects": { "type": "checkbox", "value": true, "text": "Show live weather (rain / snow / clouds)" },
+  "showSun":        { "type": "checkbox", "value": true, "text": "Sun & moon" },
+  "stars":          { "type": "checkbox", "value": true, "text": "Stars at night" },
+  "intensity":      { "type": "slider",   "value": 1.0, "min": 0.2, "max": 2.0, "step": 0.1, "text": "Motion intensity" }
+}

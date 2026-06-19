@@ -19,12 +19,15 @@ final class GlobalHotKeys {
         register(keyCode: UInt32(kVK_ANSI_RightBracket), modifiers: Self.modifiers) { model.cycleWallpaper(by: 1) }
         register(keyCode: UInt32(kVK_ANSI_LeftBracket), modifiers: Self.modifiers) { model.cycleWallpaper(by: -1) }
         register(keyCode: UInt32(kVK_ANSI_R), modifiers: Self.modifiers) { model.randomWallpaper() }
+        register(keyCode: UInt32(kVK_ANSI_D), modifiers: Self.modifiers) { model.toggleDim() }
+        register(keyCode: UInt32(kVK_Space), modifiers: Self.modifiers) { model.requestCommandPalette?() }
     }
 
     func unregisterAll() {
         for ref in refs { if let ref { UnregisterEventHotKey(ref) } }
         refs.removeAll()
         handlers.removeAll()
+        if let eventHandler { RemoveEventHandler(eventHandler); self.eventHandler = nil }
     }
 
     // MARK: Internals

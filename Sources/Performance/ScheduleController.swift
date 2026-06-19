@@ -65,6 +65,6 @@ final class ScheduleController {
         guard let id,
               model.currentItemID != id,
               let item = model.library.items.first(where: { $0.id == id }) else { return }
-        model.apply(item, addToLibrary: false, crossfade: true)
+        model.suppressingPerSpaceRecording { model.apply(item, addToLibrary: false, crossfade: true) }
     }
 }

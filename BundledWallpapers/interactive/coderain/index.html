@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Code Rain</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:block}</style>
+</head><body><canvas id="c"></canvas><script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR=Math.min(window.devicePixelRatio||1,2);
+const P={color:'#36F58A',speed:1.0,fontSize:16,trail:0.08,glow:true,reactive:true,background:'#000600'};
+const GLYPHS='ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈ0123456789ABCDEFZ:.=*+-<>'.split('');
+function hex(h){h=(h||'#fff').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return[parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+
+let cols,drops,fs;
+function resize(){W=cv.width=Math.floor(innerWidth*DPR);H=cv.height=Math.floor(innerHeight*DPR);cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';layout();}
+function layout(){fs=P.fontSize*DPR;cols=Math.ceil(W/fs);drops=[];for(let i=0;i<cols;i++)drops[i]=Math.random()*-50;}
+addEventListener('resize',resize);
+
+let mx=-1e9,my=-1e9;
+addEventListener('mousemove',e=>{mx=e.clientX*DPR;my=e.clientY*DPR;});
+window.livelyMousePos=(x,y)=>{mx=x*DPR;my=y*DPR;};
+
+window.livelyPropertyListener=function(name,val){if(name in P)P[name]=val;if(name==='fontSize')layout();};
+
+resize();
+let acc=0;
+function frame(){
+  const c=hex(P.color);
+  ctx.fillStyle='rgba('+hex(P.background).join(',')+','+P.trail+')';ctx.fillRect(0,0,W,H);
+  ctx.font=fs+'px monospace';ctx.textBaseline='top';
+  ctx.shadowBlur=P.glow?fs*0.5:0;ctx.shadowColor='rgb('+c.join(',')+')';
+  acc+=P.speed;
+  const step=acc>=1; if(step)acc=0;
+  for(let i=0;i<cols;i++){
+    const x=i*fs,y=drops[i]*fs;
+    const g=GLYPHS[(Math.random()*GLYPHS.length)|0];
+    let bright=1;
+    if(P.reactive&&mx>-1e8){const d=Math.hypot(x-mx,y-my);if(d<160*DPR)bright=1.6;}
+    // head glyph brighter
+    ctx.fillStyle='rgba('+Math.min(255,c[0]*bright+120)+','+Math.min(255,c[1]*bright+120)+','+Math.min(255,c[2]*bright+120)+',0.95)';
+    ctx.fillText(g,x,y);
+    ctx.fillStyle='rgba('+(c[0]*bright|0)+','+(c[1]*bright|0)+','+(c[2]*bright|0)+',0.8)';
+    ctx.fillText(GLYPHS[(Math.random()*GLYPHS.length)|0],x,y-fs);
+    if(step){if(y>H&&Math.random()>0.975)drops[i]=Math.random()*-30;else drops[i]+=1;}
+  }
+  ctx.shadowBlur=0;
+}
+// Warm up synchronously so the rain is established immediately (full first paint → good
+// thumbnails), then run the animation loop.
+for(let k=0;k<50;k++) frame();
+(function loop(){ frame(); requestAnimationFrame(loop); })();
+</script></body></html>

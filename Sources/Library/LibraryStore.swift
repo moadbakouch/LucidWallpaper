@@ -10,13 +10,50 @@ final class LibraryStore {
     private var overrides: [String: [String: LivelyValue]] = [:]
     /// Per-video fit/zoom/stretch, keyed by item UUID string.
     private var videoScalings: [String: VideoScaling] = [:]
+    /// Favorited item id strings.
+    private var favorites: Set<String> = []
+    /// User tags, keyed by item UUID string.
+    private var tags: [String: [String]] = [:]
+    /// Saved profiles ("scenes").
+    private(set) var profiles: [WallpaperProfile] = []
+    /// Per-wallpaper ambient sound file paths, keyed by item UUID string.
+    private var soundPaths: [String: String] = [:]
+    /// Ordered rotation playlist (empty = rotate the whole library).
+    private(set) var playlist: [PlaylistEntry] = []
+
+    func addToPlaylist(_ itemID: UUID) { playlist.append(PlaylistEntry(itemID: itemID)); save() }
+    func removeFromPlaylist(_ id: UUID) { playlist.removeAll { $0.id == id }; save() }
+    func movePlaylist(from: IndexSet, to: Int) { playlist.move(fromOffsets: from, toOffset: to); save() }
+    func setPlaylistSeconds(_ id: UUID, _ seconds: Int) {
+        if let i = playlist.firstIndex(where: { $0.id == id }) { playlist[i].seconds = max(1, seconds); save() }
+    }
 
     private struct Persisted: Codable {
         var items: [WallpaperItem]
         var currentItemID: UUID?
         var overrides: [String: [String: LivelyValue]]?
         var videoScalings: [String: VideoScaling]?
+        var favorites: [String]?
+        var tags: [String: [String]]?
+        var profiles: [WallpaperProfile]?
+        var soundPaths: [String: String]?
+        var playlist: [PlaylistEntry]?
     }
+
+    func soundURL(for id: UUID) -> URL? {
+        soundPaths[id.uuidString].map { URL(fileURLWithPath: $0) }
+    }
+    func setSound(_ url: URL?, for id: UUID) {
+        soundPaths[id.uuidString] = url?.path
+        save()
+    }
+
+    func saveProfile(_ profile: WallpaperProfile) {
+        profiles.removeAll { $0.id == profile.id || $0.name == profile.name }
+        profiles.append(profile)
+        save()
+    }
+    func deleteProfile(_ id: UUID) { profiles.removeAll { $0.id == id }; save() }
 
     init() {
         load()
@@ -38,6 +75,9 @@ final class LibraryStore {
         if currentItemID == item.id { currentItemID = nil }
         overrides[item.id.uuidString] = nil
         videoScalings[item.id.uuidString] = nil
+        favorites.remove(item.id.uuidString)
+        tags[item.id.uuidString] = nil
+        soundPaths[item.id.uuidString] = nil
         // Best-effort cleanup of the on-disk package.
         let dir = AppPaths.library.appendingPathComponent(item.id.uuidString, isDirectory: true)
         try? FileManager.default.removeItem(at: dir)
@@ -68,6 +108,24 @@ final class LibraryStore {
         save()
     }
 
+    // MARK: Favorites & tags
+
+    func isFavorite(_ id: UUID) -> Bool { favorites.contains(id.uuidString) }
+
+    func toggleFavorite(_ id: UUID) {
+        if favorites.contains(id.uuidString) { favorites.remove(id.uuidString) }
+        else { favorites.insert(id.uuidString) }
+        save()
+    }
+
+    func tags(for id: UUID) -> [String] { tags[id.uuidString] ?? [] }
+
+    func setTags(_ list: [String], for id: UUID) {
+        let cleaned = list.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        if cleaned.isEmpty { tags[id.uuidString] = nil } else { tags[id.uuidString] = cleaned }
+        save()
+    }
+
     func setCurrent(_ item: WallpaperItem?) {
         currentItemID = item?.id
         save()
@@ -82,13 +140,23 @@ final class LibraryStore {
         currentItemID = decoded.currentItemID
         overrides = decoded.overrides ?? [:]
         videoScalings = decoded.videoScalings ?? [:]
+        favorites = Set(decoded.favorites ?? [])
+        tags = decoded.tags ?? [:]
+        profiles = decoded.profiles ?? []
+        soundPaths = decoded.soundPaths ?? [:]
+        playlist = decoded.playlist ?? []
     }
 
     private func save() {
         let payload = Persisted(items: items,
                                 currentItemID: currentItemID,
                                 overrides: overrides,
-                                videoScalings: videoScalings)
+                                videoScalings: videoScalings,
+                                favorites: Array(favorites),
+                                tags: tags,
+                                profiles: profiles,
+                                soundPaths: soundPaths,
+                                playlist: playlist)
         guard let data = try? JSONEncoder().encode(payload) else { return }
         try? data.write(to: AppPaths.libraryIndex, options: .atomic)
     }

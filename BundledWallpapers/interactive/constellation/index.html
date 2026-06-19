@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Constellation</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#070a12}canvas{display:block}</style>
+</head><body><canvas id="c"></canvas><script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR=Math.min(window.devicePixelRatio||1,2);
+function resize(){W=cv.width=Math.floor(innerWidth*DPR);H=cv.height=Math.floor(innerHeight*DPR);cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';}
+addEventListener('resize',resize);resize();
+
+const P={count:90,speed:1.0,nodeColor:'#7db4ff',lineColor:'#3f6fd1',linkDist:140,pointSize:2.4,reactive:true,background:'#070a12'};
+function hex(h){h=(h||'#fff').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return[parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+
+let pts=[];
+function rebuild(){pts=[];for(let i=0;i<P.count;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()*2-1),vy:(Math.random()*2-1)});}
+rebuild();
+
+let mx=W/2,my=H/2;
+addEventListener('mousemove',e=>{mx=e.clientX*DPR;my=e.clientY*DPR;});
+window.livelyMousePos=(x,y)=>{mx=x*DPR;my=y*DPR;};
+
+window.livelyPropertyListener=function(name,val){
+  if(name==='count'){P.count=val|0;rebuild();}
+  else if(name in P){P[name]=val;}
+};
+
+function frame(){
+  ctx.fillStyle=P.background;ctx.fillRect(0,0,W,H);
+  const nc=hex(P.nodeColor),lc=hex(P.lineColor),ld=P.linkDist*DPR,sp=P.speed;
+  for(const p of pts){
+    p.x+=p.vx*sp*DPR;p.y+=p.vy*sp*DPR;
+    if(p.x<0||p.x>W)p.vx*=-1;if(p.y<0||p.y>H)p.vy*=-1;
+    p.x=Math.max(0,Math.min(W,p.x));p.y=Math.max(0,Math.min(H,p.y));
+    if(P.reactive){const dx=p.x-mx,dy=p.y-my,d=Math.hypot(dx,dy);if(d<200*DPR&&d>0.1){p.x+=dx/d*1.4*DPR;p.y+=dy/d*1.4*DPR;}}
+  }
+  for(let i=0;i<pts.length;i++){
+    for(let j=i+1;j<pts.length;j++){
+      const a=pts[i],b=pts[j],d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<ld){const al=(1-d/ld)*0.7;ctx.strokeStyle='rgba('+lc[0]+','+lc[1]+','+lc[2]+','+al+')';ctx.lineWidth=DPR;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+    }
+  }
+  ctx.fillStyle='rgb('+nc[0]+','+nc[1]+','+nc[2]+')';
+  for(const p of pts){ctx.beginPath();ctx.arc(p.x,p.y,P.pointSize*DPR,0,7);ctx.fill();}
+  requestAnimationFrame(frame);
+}
+frame();   // paint one full frame synchronously (so library thumbnails aren't blank), then loop
+</script></body></html>

@@ -10,6 +10,8 @@ final class GlobalMouseMonitor {
 
     func start(handler: @escaping (NSPoint) -> Void) {
         self.handler = handler
+        // Idempotent: callers toggle tracking on wallpaper changes, so don't stack monitors.
+        guard monitor == nil else { return }
         monitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
         ) { [weak self] _ in

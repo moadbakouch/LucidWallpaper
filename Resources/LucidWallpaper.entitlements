@@ -5,11 +5,15 @@
 	<!-- v1 ships outside the Mac App Store: no sandbox, Hardened Runtime added at release time. -->
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
-	<!-- Needed by web wallpapers that load remote resources (Three.js CDNs, Shadertoy, etc.). -->
+	<!-- Needed by web wallpapers that load remote resources (Three.js CDNs, Shadertoy, etc.),
+	     plus weather (Open-Meteo), AI shader generation, and update checks. -->
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<!-- Optional audio-reactive wallpapers (off by default). -->
-	<key>com.apple.security.device.audio-input</key>
-	<true/>
+	<!-- To enable iCloud settings sync, add the following in a Developer-ID-signed build with the
+	     iCloud (key-value) capability (requires a real Team ID):
+	     <key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	     <string>$(TeamIdentifierPrefix)com.lucidwallpaper.app</string>
+	     It is intentionally omitted here because the entitlement requires provisioning and would
+	     fail ad-hoc signing. The iCloudSync code degrades to a no-op without it. -->
 </dict>
 </plist>

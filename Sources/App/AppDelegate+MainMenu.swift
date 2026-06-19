@@ -31,7 +31,7 @@ extension AppDelegate {
         fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         addSubmenu(mainMenu, fileMenu)
 
-        // Edit (standard — needed for text fields in the settings UI).
+        // Edit (standard - needed for text fields in the settings UI).
         let editMenu = NSMenu(title: "Edit")
         editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
         let redo = editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
@@ -84,7 +84,7 @@ extension AppDelegate {
 
     // MARK: Actions
 
-    @objc func showSettings(_ sender: Any?) { openSettingsWindow() }
+    @objc func showSettings(_ sender: Any?) { model.settingsTab = "settings"; openSettingsWindow() }
     @objc func showAbout(_ sender: Any?) { NSApp.orderFrontStandardAboutPanel(sender) }
     @objc func togglePauseAction(_ sender: Any?) { model.togglePause() }
     @objc func nextWallpaperAction(_ sender: Any?) { model.cycleWallpaper(by: 1) }

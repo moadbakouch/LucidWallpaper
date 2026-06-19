@@ -19,7 +19,7 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         }
     }
 
-    private struct Uniforms { var res: SIMD2<Float>; var time: Float; var mouse: SIMD2<Float> }
+    private struct Uniforms { var res: SIMD2<Float>; var time: Float; var mouse: SIMD2<Float>; var brightness: Float }
 
     private let host = MetalHostView()
     private let device = MTLCreateSystemDefaultDevice()
@@ -31,6 +31,9 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     private var paused = false
     private var fpsCap = 0
     private var mouse = SIMD2<Float>(0.5, 0.5)
+    /// User-adjustable universal shader controls (apply to any shader).
+    private var speed: Float = 1
+    private var brightness: Float = 1
 
     var view: NSView { host }
     private var metalLayer: CAMetalLayer { host.metalLayer }
@@ -52,8 +55,14 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         startDisplayLink()
     }
 
-    func play() { paused = false }
-    func pause() { paused = true }
+    func play() {
+        paused = false
+        displayLink?.isPaused = false   // stop firing the vsync callback entirely while paused
+    }
+    func pause() {
+        paused = true
+        displayLink?.isPaused = true
+    }
     func stop() {
         displayLink?.invalidate()
         displayLink = nil
@@ -63,13 +72,45 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         mouse = SIMD2<Float>(Float(point.x), Float(point.y))
     }
 
-    func setFrameRateCap(_ fps: Int) { fpsCap = fps }
+    // Universal shader controls (Speed / Brightness), driven like Lively properties.
+    func setProperties(_ values: [String: LivelyValue]) { for (k, v) in values { applyParam(k, v) } }
+    func setProperty(_ name: String, value: LivelyValue) { applyParam(name, value) }
+    private func applyParam(_ name: String, _ value: LivelyValue) {
+        guard case .number(let d) = value else { return }
+        switch name {
+        case "speed": speed = Float(d)
+        case "brightness": brightness = Float(d)
+        default: break
+        }
+    }
+
+    func setFrameRateCap(_ fps: Int) {
+        fpsCap = fps
+        applyFrameRateRange()
+    }
+
+    /// Ask the OS to fire the display link fewer times (true power saving - on a 120 Hz panel
+    /// a 30 fps cap is ~4× fewer GPU passes), not just skip draws inside a full-rate callback.
+    private func applyFrameRateRange() {
+        guard let displayLink else { return }
+        if fpsCap > 0 {
+            let f = Float(fpsCap)
+            displayLink.preferredFrameRateRange = CAFrameRateRange(minimum: f, maximum: f, preferred: f)
+        } else {
+            displayLink.preferredFrameRateRange = .default
+        }
+    }
 
     // MARK: Rendering
 
     private func startDisplayLink() {
         displayLink?.invalidate()
         let link = host.displayLink(target: self, selector: #selector(render))
+        link.isPaused = paused   // honor a pause requested before the link existed
+        if fpsCap > 0 {
+            let f = Float(fpsCap)
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: f, maximum: f, preferred: f)
+        }
         link.add(to: .main, forMode: .common)
         displayLink = link
     }
@@ -82,8 +123,9 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         lastDraw = now
 
         var u = Uniforms(res: SIMD2(Float(metalLayer.drawableSize.width), Float(metalLayer.drawableSize.height)),
-                         time: Float(now - startTime),
-                         mouse: mouse)
+                         time: Float(now - startTime) * speed,
+                         mouse: mouse,
+                         brightness: brightness)
 
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
@@ -115,11 +157,11 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         }
     }
 
-    private static let shaderHeader = """
+    nonisolated static let shaderHeader = """
     #include <metal_stdlib>
     using namespace metal;
     struct LWVertexOut { float4 position [[position]]; float2 uv; };
-    struct LWUniforms { float2 res; float time; float2 mouse; };
+    struct LWUniforms { float2 res; float time; float2 mouse; float brightness; };
     vertex LWVertexOut lw_vertex(uint vid [[vertex_id]]) {
         float2 p[3] = { float2(-1.0, -1.0), float2(3.0, -1.0), float2(-1.0, 3.0) };
         LWVertexOut o;
@@ -129,13 +171,14 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
     }
     """
 
-    private static let shaderFooter = """
+    nonisolated static let shaderFooter = """
     fragment float4 lw_fragment(LWVertexOut in [[stage_in]], constant LWUniforms& u [[buffer(0)]]) {
-        return shade(in.uv, u.res, u.time, u.mouse);
+        float4 c = shade(in.uv, u.res, u.time, u.mouse);
+        return float4(c.rgb * u.brightness, 1.0);
     }
     """
 
-    /// Bundled sample shader (also the fallback) — an interactive plasma.
+    /// Bundled sample shader (also the fallback) - an interactive plasma.
     static let defaultShade = """
     float4 shade(float2 uv, float2 res, float time, float2 mouse) {
         float2 p = uv * 4.0;

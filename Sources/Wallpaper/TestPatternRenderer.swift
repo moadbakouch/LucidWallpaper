@@ -2,7 +2,7 @@ import AppKit
 import QuartzCore
 
 /// A built-in animated gradient. Its only purpose is to validate, on real hardware, that
-/// the desktop-level window renders behind icons and that the global mouse feed works —
+/// the desktop-level window renders behind icons and that the global mouse feed works -
 /// before wiring up real video/web content. Moving the cursor shifts the gradient.
 @MainActor
 final class TestPatternRenderer: NSObject, WallpaperRenderer {

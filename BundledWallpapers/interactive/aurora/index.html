@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Aurora</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#03060f}canvas{display:block}</style>
+</head><body><canvas id="c"></canvas><script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR=Math.min(window.devicePixelRatio||1,2);
+function resize(){W=cv.width=Math.floor(innerWidth*DPR);H=cv.height=Math.floor(innerHeight*DPR);cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';}
+addEventListener('resize',resize);resize();
+
+const P={color1:'#26F0C8',color2:'#A14DFF',speed:1.0,amplitude:1.0,bands:5,reactive:true,background:'#03060F'};
+function hex(h){h=(h||'#fff').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return[parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+function mix(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+
+let mxn=0.5,t=0;
+addEventListener('mousemove',e=>{mxn=e.clientX/innerWidth;});
+window.livelyMousePos=(x,y)=>{mxn=x/innerWidth;};
+
+window.livelyPropertyListener=function(name,val){if(name in P)P[name]=val;};
+
+function frame(){
+  t+=0.01*P.speed;
+  ctx.fillStyle=P.background;ctx.fillRect(0,0,W,H);
+  ctx.globalCompositeOperation='lighter';
+  const c1=hex(P.color1),c2=hex(P.color2),N=Math.max(1,P.bands|0);
+  const shift=P.reactive?(mxn-0.5)*0.8:0;
+  for(let b=0;b<N;b++){
+    const f=b/(N-1||1),col=mix(c1,c2,f);
+    const amp=H*0.16*P.amplitude,baseY=H*(0.25+0.5*f);
+    const ph=t*(0.7+f*0.6)+f*3.0+shift*3.0;
+    ctx.beginPath();ctx.moveTo(0,H);
+    for(let x=0;x<=W;x+=16*DPR){
+      const u=x/W;
+      const y=baseY+Math.sin(u*6.28*1.6+ph)*amp+Math.sin(u*6.28*0.7-ph*0.6)*amp*0.5;
+      ctx.lineTo(x,y);
+    }
+    ctx.lineTo(W,H);ctx.closePath();
+    const g=ctx.createLinearGradient(0,baseY-amp,0,H);
+    g.addColorStop(0,'rgba('+(col[0]|0)+','+(col[1]|0)+','+(col[2]|0)+',0.0)');
+    g.addColorStop(0.35,'rgba('+(col[0]|0)+','+(col[1]|0)+','+(col[2]|0)+',0.28)');
+    g.addColorStop(1,'rgba('+(col[0]|0)+','+(col[1]|0)+','+(col[2]|0)+',0.0)');
+    ctx.fillStyle=g;ctx.fill();
+  }
+  ctx.globalCompositeOperation='source-over';
+  requestAnimationFrame(frame);
+}
+frame();   // paint one full frame synchronously (so library thumbnails aren't blank), then loop
+</script></body></html>

@@ -30,8 +30,6 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 LucidWallpaper. All rights reserved.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>LucidWallpaper analyzes audio to make wallpapers react to sound. This is optional and off by default.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

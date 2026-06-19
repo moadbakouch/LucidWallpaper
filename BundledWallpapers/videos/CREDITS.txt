@@ -1,0 +1,9 @@
+Bundled video wallpapers - sourced from Coverr (https://coverr.co).
+Coverr License: free for commercial and personal use, no attribution required.
+(Attribution included here as courtesy.)
+
+  mountain-summit.mp4  - "Walking to the Mountain Top"            coverr.co
+  liquid-flow.mp4      - "Green Liquid With Black Particles"      coverr.co
+  cozy-cabin.mp4       - "Cozy Cabin Interior w/ Crackling Fire"  coverr.co
+  city-nights.mp4      - "Gloomy City at Night"                   coverr.co
+  cyberpunk.mp4        - "Cybernetic Dreamscape"                  coverr.co

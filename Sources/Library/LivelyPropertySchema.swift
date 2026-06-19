@@ -26,6 +26,17 @@ enum LivelyPropertySchema {
         }
     }
 
+    /// Universal controls offered for every Metal shader wallpaper (applied by the renderer).
+    static let shaderEntries: [LivelyPropertyEntry] = [
+        LivelyPropertyEntry(name: "speed",
+                            property: LivelyProperty(type: "slider", text: "Speed", value: .number(1),
+                                                     min: 0.1, max: 3, step: 0.1, items: nil, help: nil)),
+        LivelyPropertyEntry(name: "brightness",
+                            property: LivelyProperty(type: "slider", text: "Brightness", value: .number(1),
+                                                     min: 0.2, max: 2, step: 0.1, items: nil, help: nil)),
+    ]
+    static let shaderDefaults: [String: LivelyValue] = ["speed": .number(1), "brightness": .number(1)]
+
     /// Scan raw JSON for top-level object keys in textual order.
     private static func orderedTopLevelKeys(in data: Data) -> [String] {
         guard let s = String(data: data, encoding: .utf8) else { return [] }

@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Plasma Orbs</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#05030c}canvas{display:block}</style>
+</head><body><canvas id="c"></canvas><script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR=Math.min(window.devicePixelRatio||1,2);
+function resize(){W=cv.width=Math.floor(innerWidth*DPR);H=cv.height=Math.floor(innerHeight*DPR);cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';}
+addEventListener('resize',resize);resize();
+
+const P={count:14,size:1.0,color1:'#FF4D8D',color2:'#4D9DFF',speed:1.0,reactive:true,background:'#05030C'};
+function hex(h){h=(h||'#fff').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return[parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+function mix(a,b,t){return[a[0]+(b[0]-a[0])*t|0,a[1]+(b[1]-a[1])*t|0,a[2]+(b[2]-a[2])*t|0];}
+
+let orbs=[];
+function rebuild(){orbs=[];const c1=hex(P.color1),c2=hex(P.color2);for(let i=0;i<P.count;i++){const f=Math.random();orbs.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()*2-1),vy:(Math.random()*2-1),r:(60+Math.random()*120),col:mix(c1,c2,f)});}}
+rebuild();
+function recolor(){const c1=hex(P.color1),c2=hex(P.color2);orbs.forEach((o,i)=>{o.col=mix(c1,c2,i/(orbs.length-1||1));});}
+
+let mx=-1e9,my=-1e9;
+addEventListener('mousemove',e=>{mx=e.clientX*DPR;my=e.clientY*DPR;});
+window.livelyMousePos=(x,y)=>{mx=x*DPR;my=y*DPR;};
+
+window.livelyPropertyListener=function(name,val){
+  if(name==='count'){P.count=val|0;rebuild();}
+  else if(name in P){P[name]=val; if(name==='color1'||name==='color2')recolor();}
+};
+
+function frame(){
+  ctx.fillStyle=P.background;ctx.fillRect(0,0,W,H);
+  ctx.globalCompositeOperation='lighter';
+  const sp=P.speed*DPR;
+  for(const o of orbs){
+    o.x+=o.vx*sp;o.y+=o.vy*sp;
+    if(o.x<-o.r)o.x=W+o.r;if(o.x>W+o.r)o.x=-o.r;if(o.y<-o.r)o.y=H+o.r;if(o.y>H+o.r)o.y=-o.r;
+    if(P.reactive&&mx>-1e8){const dx=o.x-mx,dy=o.y-my,d=Math.hypot(dx,dy);if(d<260*DPR&&d>0.1){o.x+=dx/d*3.2*DPR;o.y+=dy/d*3.2*DPR;}}
+    const r=o.r*P.size*DPR;
+    const g=ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,r);
+    g.addColorStop(0,'rgba('+o.col[0]+','+o.col[1]+','+o.col[2]+',0.55)');
+    g.addColorStop(0.5,'rgba('+o.col[0]+','+o.col[1]+','+o.col[2]+',0.16)');
+    g.addColorStop(1,'rgba('+o.col[0]+','+o.col[1]+','+o.col[2]+',0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(o.x,o.y,r,0,7);ctx.fill();
+  }
+  ctx.globalCompositeOperation='source-over';
+  requestAnimationFrame(frame);
+}
+frame();   // paint one full frame synchronously (so library thumbnails aren't blank), then loop
+</script></body></html>

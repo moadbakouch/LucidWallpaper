@@ -5,7 +5,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private var statusBar: StatusBarController!
     var settingsWindow: SettingsWindowController!
-    let mouseMonitor = GlobalMouseMonitor()
+    private var onboarding: OnboardingWindowController?
+    private var commandPalette: CommandPaletteController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.start()
@@ -15,21 +16,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settingsWindow.show()
         })
 
-        // Feed the global cursor position into whichever wallpaper sits under it, so
-        // mouse-follow / parallax wallpapers react. Monitoring .mouseMoved needs no
-        // special permission.
-        mouseMonitor.start { [weak self] location in
-            self?.model.windowManager.updateMouse(globalLocation: location)
-        }
+        let palette = CommandPaletteController(model: model)
+        commandPalette = palette
+        model.requestCommandPalette = { [weak palette] in palette?.toggle() }
+
+        // The global cursor feed into mouse-follow / parallax wallpapers is owned by AppModel,
+        // which only enables it for interactive (web/shader) wallpapers.
 
         if !applyAutostartIfRequested() {
             model.restoreLast()
-            // Open the control window the first time the app runs, so it's discoverable
-            // rather than hidden behind the menu-bar icon.
+            // First run: show the welcome / setup flow instead of dropping straight into settings.
             let defaults = UserDefaults.standard
-            if !defaults.bool(forKey: "hasLaunchedBefore") {
+            let force = ProcessInfo.processInfo.environment["LUCIDWALL_ONBOARD"] != nil
+            if force || !defaults.bool(forKey: "didOnboardV1") {
+                defaults.set(true, forKey: "didOnboardV1")
                 defaults.set(true, forKey: "hasLaunchedBefore")
-                settingsWindow.show()
+                showOnboarding()
             }
         }
 
@@ -38,11 +40,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if let cap = ProcessInfo.processInfo.environment["LUCIDWALL_FPS_CAP"], let n = Int(cap) {
-            model.windowManager.setFrameRateCap(n)
+            model.windowManager.setBaseFrameRateCap(n)
         }
 
         if let path = ProcessInfo.processInfo.environment["LUCIDWALL_SNAPSHOT"] {
             scheduleSnapshot(to: path)
+        }
+
+        if ProcessInfo.processInfo.environment["LUCIDWALL_TEST_SAVER_INSTALL"] != nil {
+            NSLog("[LucidWallpaper] saver bundled=%@ installed=%@",
+                  SaverInstaller.isAvailable ? "yes" : "no", SaverInstaller.isInstalled ? "yes" : "no")
+            do { let url = try SaverInstaller.install(); NSLog("[LucidWallpaper] saver installed -> %@", url.path) }
+            catch { NSLog("[LucidWallpaper] saver install failed: %@", "\(error)") }
         }
 
         if ProcessInfo.processInfo.environment["LUCIDWALL_GEN_THUMBS"] != nil {
@@ -54,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Debug: drive a synthetic cursor (to show mouse reactivity), then write a PNG of the
-    /// current wallpaper. Uses the renderer's own snapshot — no Screen Recording permission.
+    /// current wallpaper. Uses the renderer's own snapshot - no Screen Recording permission.
     private func scheduleSnapshot(to path: String) {
         let center = NSScreen.main.map { NSPoint(x: $0.frame.midX, y: $0.frame.midY) }
         for delay in [0.8, 1.2, 1.6, 2.0] {
@@ -77,7 +86,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        mouseMonitor.stop()
         model.stop()
     }
 
@@ -89,6 +97,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func openSettingsWindow() {
         settingsWindow.show()
+    }
+
+    private func showOnboarding() {
+        let controller = OnboardingWindowController(model: model)
+        controller.onFinish = { [weak self] in self?.settingsWindow.show() }
+        onboarding = controller
+        controller.show()
     }
 
     // MARK: Autostart (debug/verification)
@@ -126,10 +141,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             let url = URL(fileURLWithPath: value)
             let ext = url.pathExtension.lowercased()
-            let imageExts = ["png", "jpg", "jpeg", "heic", "heif", "gif", "tiff", "bmp", "webp"]
+            let imageExts = ["png", "jpg", "jpeg", "heic", "heif", "tiff", "bmp", "webp"]
             let kind: WallpaperKind
-            if ext == "html" || ext == "htm" { kind = .web }
+            if url.hasDirectoryPath { kind = .slideshow }
+            else if ext == "html" || ext == "htm" { kind = .web }
             else if ext == "metal" { kind = .shader }
+            else if ext == "gif" { kind = .gif }
             else if imageExts.contains(ext) { kind = .image }
             else { kind = .video }
             model.applyTransient(WallpaperItem(title: url.lastPathComponent, kind: kind, contentURL: url))

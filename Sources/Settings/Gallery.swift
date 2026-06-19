@@ -12,8 +12,6 @@ struct GalleryItem: Identifiable {
 enum Gallery {
     /// Curated set of open Lively wallpaper packages (GitHub source archives).
     static let curated: [GalleryItem] = [
-        GalleryItem(title: "Audio Visualizer", author: "rocksdanister",
-                    downloadURL: URL(string: "https://github.com/rocksdanister/audio-visualizer-wallpaper/archive/refs/heads/main.zip")!),
         GalleryItem(title: "Depth Map", author: "rocksdanister",
                     downloadURL: URL(string: "https://github.com/rocksdanister/depthmap-wallpaper/archive/refs/heads/main.zip")!),
         GalleryItem(title: "Forest", author: "Pabilo8",

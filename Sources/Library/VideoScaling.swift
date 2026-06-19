@@ -4,9 +4,9 @@ import AVFoundation
 /// How a video wallpaper fills its screen. Persisted per wallpaper.
 struct VideoScaling: Codable, Hashable {
     enum Mode: String, Codable, CaseIterable, Identifiable {
-        case fill      // crop to fill (no bars) — resizeAspectFill
-        case fit       // letterbox to show the whole frame — resizeAspect
-        case stretch   // distort to exactly fit — resize
+        case fill      // crop to fill (no bars) - resizeAspectFill
+        case fit       // letterbox to show the whole frame - resizeAspect
+        case stretch   // distort to exactly fit - resize
 
         var id: String { rawValue }
 

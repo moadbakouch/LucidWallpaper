@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Hyperspace</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:block}</style>
+</head><body><canvas id="c"></canvas><script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W,H,DPR=Math.min(window.devicePixelRatio||1,2);
+function resize(){W=cv.width=Math.floor(innerWidth*DPR);H=cv.height=Math.floor(innerHeight*DPR);cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';}
+addEventListener('resize',resize);resize();
+
+const P={count:750,speed:1.6,color:'#FFFFFF',warp:0.6,reactive:true,background:'#000008'};
+function hex(h){h=(h||'#fff').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return[parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+
+// Normalized stars: x,y in [-1,1], z in (0,1]. Projected with a focal length so the field
+// stays dense on screen and streaks radiate from the centre.
+let stars=[];
+function mk(reset){return{x:Math.random()*2-1,y:Math.random()*2-1,z:reset?1:Math.random(),pz:1};}
+function rebuild(){stars=[];for(let i=0;i<P.count;i++){const s=mk(false);s.pz=s.z;stars.push(s);}}
+rebuild();
+
+let cx=0,cy=0,tcx=0,tcy=0;
+addEventListener('mousemove',e=>{tcx=(e.clientX/innerWidth-0.5)*0.5;tcy=(e.clientY/innerHeight-0.5)*0.5;});
+window.livelyMousePos=(x,y)=>{tcx=(x/innerWidth-0.5)*0.5;tcy=(y/innerHeight-0.5)*0.5;};
+
+window.livelyPropertyListener=function(name,val){
+  if(name==='count'){P.count=val|0;rebuild();}
+  else if(name in P){P[name]=val;}
+};
+
+const F=0.42;   // focal length (spread)
+function frame(){
+  const bg=hex(P.background);
+  // Solid clear: each frame draws a complete radial streak field (streaks come from the
+  // star's previous-depth projection), so it reads full instantly and never depends on
+  // accumulated trails.
+  ctx.fillStyle='rgb('+bg[0]+','+bg[1]+','+bg[2]+')';ctx.fillRect(0,0,W,H);
+  if(P.reactive){cx+=(tcx-cx)*0.06;cy+=(tcy-cy)*0.06;}else{cx+=(0-cx)*0.06;cy+=(0-cy)*0.06;}
+  const c=hex(P.color),ox=W/2+cx*W,oy=H/2+cy*W,dz=0.006*P.speed;
+  ctx.lineCap='round';
+  for(const s of stars){
+    s.pz=s.z;s.z-=dz;
+    if(s.z<0.02){s.x=Math.random()*2-1;s.y=Math.random()*2-1;s.z=1;s.pz=1;}
+    const sx=ox+(s.x/s.z)*F*W, sy=oy+(s.y/s.z)*F*W;
+    // Tail = projection at a deeper z, so each frame shows a full-length warp streak.
+    const ztail=Math.min(1, s.z*(1+0.45*P.warp+0.05));
+    const tx=ox+(s.x/ztail)*F*W, ty=oy+(s.y/ztail)*F*W;
+    const r=1-s.z;                      // 0 (far) → 1 (near)
+    const a=Math.min(1,0.45+r*0.9);
+    const g=ctx.createLinearGradient(tx,ty,sx,sy);
+    g.addColorStop(0,'rgba('+c[0]+','+c[1]+','+c[2]+',0)');
+    g.addColorStop(1,'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')');
+    ctx.strokeStyle=g;
+    ctx.lineWidth=Math.max(DPR*0.9,r*3.0*DPR);
+    ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(sx,sy);ctx.stroke();
+    ctx.fillStyle='rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';
+    ctx.beginPath();ctx.arc(sx,sy,Math.max(DPR*0.8,r*2.2*DPR),0,7);ctx.fill();
+  }
+  requestAnimationFrame(frame);
+}
+frame();   // paint one full frame synchronously (so library thumbnails aren't blank), then loop
+</script></body></html>

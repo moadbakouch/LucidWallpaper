@@ -6,13 +6,15 @@ struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        TabView {
-            GeneralView()
-                .tabItem { Label("General", systemImage: "gearshape") }
+        TabView(selection: $model.settingsTab) {
             WallpaperGridView(kind: .video)
-                .tabItem { Label("Videos", systemImage: "film") }
+                .tabItem { Label("Videos", systemImage: "film") }.tag("videos")
             WallpaperGridView(kind: .web)
-                .tabItem { Label("Interactive", systemImage: "globe") }
+                .tabItem { Label("Interactive", systemImage: "globe") }.tag("interactive")
+            StoreView()
+                .tabItem { Label("Store", systemImage: "bag") }.tag("store")
+            GeneralView()
+                .tabItem { Label("Settings", systemImage: "gearshape") }.tag("settings")
         }
         .frame(minWidth: 680, minHeight: 520)
         // Drag a .zip / Lively folder / video / image onto the window to add it.
@@ -34,8 +36,17 @@ struct SettingsView: View {
     @MainActor private func route(_ url: URL) {
         let ext = url.pathExtension.lowercased()
         let title = url.deletingPathExtension().lastPathComponent
-        if ext == "zip" || url.hasDirectoryPath {
+        if url.hasDirectoryPath {
+            // A Lively package folder imports; any other folder becomes a photo slideshow.
+            if FileManager.default.fileExists(atPath: url.appendingPathComponent("LivelyInfo.json").path) {
+                try? model.importLively(at: url)
+            } else {
+                model.apply(.slideshow(folder: url), addToLibrary: true)
+            }
+        } else if ext == "zip" {
             try? model.importLively(at: url)
+        } else if ext == "gif" {
+            model.apply(WallpaperItem(title: title, kind: .gif, contentURL: url), addToLibrary: true)
         } else if ["mp4", "mov", "m4v", "webm", "mkv", "avi", "wmv"].contains(ext) {
             model.apply(WallpaperItem(title: title, kind: .video, contentURL: url), addToLibrary: true)
         } else if WallpaperGridView.imageExtensions.contains(ext) {
@@ -83,6 +94,8 @@ struct ThumbnailView: View {
         case .web: return "globe"
         case .shader: return "wand.and.stars"
         case .image: return "photo"
+        case .gif: return "photo.stack"
+        case .slideshow: return "photo.on.rectangle.angled"
         case .test: return "paintpalette"
         }
     }

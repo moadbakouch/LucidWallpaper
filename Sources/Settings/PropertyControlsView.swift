@@ -29,9 +29,10 @@ struct PropertyControlsView: View {
                     Spacer()
                     Text(numberString(entry)).foregroundStyle(.secondary)
                 }
-                Slider(value: numberBinding(entry),
-                       in: (property.min ?? 0)...(property.max ?? 100),
-                       step: property.step ?? 1)
+                // Clamp so a malformed imported package (min ≥ max, step ≤ 0) can't trap.
+                let lo = property.min ?? 0
+                let hi = max(lo + 0.0001, property.max ?? 100)
+                Slider(value: numberBinding(entry), in: lo...hi, step: max(property.step ?? 1, 0.0001))
             }
 
         case "checkbox":

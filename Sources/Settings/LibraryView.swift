@@ -7,16 +7,31 @@ struct WallpaperGridView: View {
     @EnvironmentObject private var model: AppModel
     let kind: WallpaperKind
     @State private var selectedID: UUID?
-    @State private var showGallery = false
+    @State private var search = ""
+    @State private var favoritesOnly = false
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: 16)]
 
-    private var items: [WallpaperItem] {
+    private var kindItems: [WallpaperItem] {
         switch kind {
         case .web:   return model.items.filter { $0.kind == .web || $0.kind == .shader }
-        case .video: return model.items.filter { $0.kind == .video || $0.kind == .image }
+        case .video: return model.items.filter { [.video, .image, .gif, .slideshow].contains($0.kind) }
         default:     return model.items.filter { $0.kind == kind }
         }
+    }
+
+    private var items: [WallpaperItem] {
+        var list = kindItems
+        if favoritesOnly { list = list.filter { model.isFavorite($0) } }
+        let q = search.trimmingCharacters(in: .whitespaces).lowercased()
+        if !q.isEmpty {
+            list = list.filter { item in
+                item.title.lowercased().contains(q)
+                    || (item.desc?.lowercased().contains(q) ?? false)
+                    || model.tags(for: item).contains { $0.lowercased().contains(q) }
+            }
+        }
+        return list
     }
 
     static let imageExtensions = ["png", "jpg", "jpeg", "heic", "heif", "gif", "tiff", "tif", "bmp", "webp"]
@@ -25,8 +40,11 @@ struct WallpaperGridView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if items.isEmpty {
+            if kindItems.isEmpty {
                 emptyState
+            } else if items.isEmpty {
+                ContentUnavailableView("No matches", systemImage: "magnifyingglass",
+                                       description: Text("Nothing matches your search or filter."))
             } else {
                 HStack(spacing: 0) {
                     grid.frame(maxWidth: .infinity)
@@ -38,7 +56,12 @@ struct WallpaperGridView: View {
             HStack(spacing: 10) { importControls; Spacer() }.padding(12)
         }
         .onAppear { selectedID = currentOrFirst }
-        .sheet(isPresented: $showGallery) { GalleryView() }
+        .onChange(of: items) { _, newItems in
+            // If a search/favorites filter hid the selection, fall back to the first match.
+            if selectedID == nil || !newItems.contains(where: { $0.id == selectedID }) {
+                selectedID = newItems.first?.id
+            }
+        }
     }
 
     private var currentOrFirst: UUID? {
@@ -47,10 +70,18 @@ struct WallpaperGridView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: kind == .video ? "film" : "globe").foregroundStyle(.tint)
-            Text(headerText).font(.callout).foregroundStyle(.secondary)
-            Spacer()
+        VStack(spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: kind == .video ? "film" : "globe").foregroundStyle(.tint)
+                Text(headerText).font(.callout).foregroundStyle(.secondary)
+                Spacer()
+            }
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search by name, tag…", text: $search).textFieldStyle(.roundedBorder)
+                Toggle(isOn: $favoritesOnly) { Label("Favorites", systemImage: favoritesOnly ? "star.fill" : "star") }
+                    .toggleStyle(.button)
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
     }
@@ -58,10 +89,10 @@ struct WallpaperGridView: View {
     private var headerText: String {
         switch kind {
         case .video:
-            return "Video wallpapers — any mp4/mov/m4v/webm, looped silently and hardware-decoded. "
+            return "Video wallpapers - any mp4/mov/m4v/webm, looped silently and hardware-decoded. "
                  + "Set Fill / Fit / Stretch + zoom per wallpaper. All resolutions supported."
         default:
-            return "Interactive wallpapers — HTML/WebGL that react to your mouse. "
+            return "Interactive wallpapers - HTML/WebGL that react to your mouse. "
                  + "Import Lively packages (.zip) and they run unchanged."
         }
     }
@@ -138,7 +169,6 @@ struct WallpaperGridView: View {
             } label: { Label("Add", systemImage: "plus") }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            Button { showGallery = true } label: { Label("Gallery", systemImage: "square.grid.3x3.fill") }
         }
     }
 
@@ -206,9 +236,11 @@ struct WallpaperGridView: View {
 }
 
 struct WallpaperCell: View {
+    @EnvironmentObject private var model: AppModel
     let item: WallpaperItem
     let isCurrent: Bool
     let isSelected: Bool
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -222,6 +254,17 @@ struct WallpaperCell: View {
                         .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12),
                                       lineWidth: isSelected ? 2.5 : 1)
                 }
+                .overlay(alignment: .topLeading) {
+                    // Favorite star - visible on hover or when favorited.
+                    if hovering || model.isFavorite(item) {
+                        Button { model.toggleFavorite(item) } label: {
+                            Image(systemName: model.isFavorite(item) ? "star.fill" : "star")
+                                .foregroundStyle(model.isFavorite(item) ? .yellow : .white)
+                                .padding(5).shadow(radius: 1)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 .overlay(alignment: .topTrailing) {
                     if isCurrent {
                         Image(systemName: "checkmark.circle.fill")
@@ -231,6 +274,7 @@ struct WallpaperCell: View {
                             .shadow(radius: 1)
                     }
                 }
+                .shadow(color: .black.opacity(hovering ? 0.3 : 0), radius: hovering ? 8 : 0, y: hovering ? 4 : 0)
 
             Text(item.title)
                 .font(.callout)
@@ -240,6 +284,9 @@ struct WallpaperCell: View {
         }
         .padding(6)
         .contentShape(Rectangle())
+        .scaleEffect(hovering ? 1.03 : 1)
+        .animation(.easeOut(duration: 0.15), value: hovering)
+        .onHover { hovering = $0 }
     }
 }
 
@@ -268,18 +315,18 @@ struct WallpaperDetail: View {
                 }
 
                 HStack(spacing: 8) {
+                    applyControl
                     Button {
-                        model.apply(item, addToLibrary: false)
+                        model.toggleFavorite(item)
                     } label: {
-                        Label(model.currentItemID == item.id ? "Applied" : "Apply",
-                              systemImage: model.currentItemID == item.id ? "checkmark" : "play.fill")
+                        Image(systemName: model.isFavorite(item) ? "star.fill" : "star")
+                            .foregroundStyle(model.isFavorite(item) ? .yellow : .secondary)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.currentItemID == item.id)
+                    .help("Favorite")
                     Button("Remove", role: .destructive, action: onRemoved)
                 }
 
-                if item.kind == .video || item.kind == .image {
+                if item.kind == .video || item.kind == .image || item.kind == .gif || item.kind == .slideshow {
                     Divider()
                     Text("Fit").font(.headline)
                     VideoControlsView(item: item)
@@ -287,14 +334,160 @@ struct WallpaperDetail: View {
                     let entries = model.propertyEntries(for: item)
                     if !entries.isEmpty {
                         Divider()
-                        Text("Customize").font(.headline)
+                        HStack {
+                            Text("Customize").font(.headline)
+                            Spacer()
+                            Button { model.randomizeProperties(for: item) } label: {
+                                Label("Randomize", systemImage: "dice").labelStyle(.iconOnly)
+                            }
+                            .help("Randomize colors, speed and more")
+                        }
                         PropertyControlsView(item: item, entries: entries)
                     }
                 }
+
+                Divider()
+                PaletteView(item: item)
+                Divider()
+                SoundPicker(item: item)
+                Divider()
+                TagEditor(item: item)
                 Spacer(minLength: 0)
             }
             .padding(18)
         }
+    }
+
+    private var isApplied: Bool { model.currentItemID == item.id }
+
+    /// Apply button. With multiple displays it becomes a menu: all displays, or just one.
+    @ViewBuilder private var applyControl: some View {
+        let screens = NSScreen.screens
+        if screens.count > 1 {
+            Menu {
+                Button("All Displays") { model.applyToAllDisplays(item) }
+                Divider()
+                ForEach(Array(screens.enumerated()), id: \.offset) { index, screen in
+                    Button(screenLabel(screen, index)) {
+                        model.applyToDisplay(item, displayID: screen.displayID)
+                    }
+                }
+            } label: {
+                Label(isApplied ? "Applied" : "Apply", systemImage: isApplied ? "checkmark" : "play.fill")
+            } primaryAction: {
+                model.applyToAllDisplays(item)
+            }
+            .menuStyle(.borderlessButton)
+            .buttonStyle(.borderedProminent)
+            .fixedSize()
+        } else {
+            Button {
+                model.apply(item, addToLibrary: false)
+            } label: {
+                Label(isApplied ? "Applied" : "Apply", systemImage: isApplied ? "checkmark" : "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isApplied)
+        }
+    }
+
+    private func screenLabel(_ screen: NSScreen, _ index: Int) -> String {
+        let name = screen.localizedName
+        return name.isEmpty ? "Display \(index + 1)" : name
+    }
+}
+
+/// Shows the dominant-color palette of a wallpaper's preview.
+struct PaletteView: View {
+    let item: WallpaperItem
+    @State private var colors: [Color] = []
+
+    var body: some View {
+        Group {
+            if !colors.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Colors").font(.headline)
+                    HStack(spacing: 6) {
+                        ForEach(Array(colors.enumerated()), id: \.offset) { _, c in
+                            RoundedRectangle(cornerRadius: 5).fill(c).frame(width: 34, height: 24)
+                                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.primary.opacity(0.12)))
+                        }
+                    }
+                }
+            }
+        }
+        .task(id: item.id) {
+            colors = []
+            if let img = await ThumbnailProvider.image(for: item) {
+                colors = PaletteExtractor.colors(from: img).map { Color(nsColor: $0) }
+            }
+        }
+    }
+}
+
+/// Assign an optional looping ambient sound to a wallpaper.
+struct SoundPicker: View {
+    @EnvironmentObject private var model: AppModel
+    let item: WallpaperItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Ambient Sound").font(.headline)
+            if let url = model.soundURL(for: item) {
+                HStack(spacing: 6) {
+                    Image(systemName: "music.note").foregroundStyle(.tint)
+                    Text(url.lastPathComponent).font(.caption).lineLimit(1)
+                    Spacer()
+                    Button { model.setSound(nil, for: item) } label: { Image(systemName: "xmark.circle.fill") }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                }
+            } else {
+                Button { pick() } label: { Label("Add sound…", systemImage: "music.note") }
+            }
+            Text("Loops while this wallpaper is active. Set the master volume in Settings → Live Effects.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .id(item.id)
+    }
+
+    private func pick() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.setSound(url, for: item)
+    }
+}
+
+/// Comma-separated tag editor, used for search/filtering.
+struct TagEditor: View {
+    @EnvironmentObject private var model: AppModel
+    let item: WallpaperItem
+    @State private var text = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Tags").font(.headline)
+            TextField("comma, separated, tags", text: $text)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { commit() }
+            if !model.tags(for: item).isEmpty {
+                HStack {
+                    ForEach(model.tags(for: item), id: \.self) { tag in
+                        Text(tag).font(.caption)
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.18)))
+                    }
+                }
+            }
+        }
+        .id(item.id)
+        .onAppear { text = model.tags(for: item).joined(separator: ", ") }
+    }
+
+    private func commit() {
+        model.setTags(text.split(separator: ",").map(String.init), for: item)
     }
 }
 

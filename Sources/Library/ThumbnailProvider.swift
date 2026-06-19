@@ -39,9 +39,18 @@ enum ThumbnailProvider {
         switch item.kind {
         case .video: return await videoFrame(item.contentURL)
         case .web:   return await WebThumbnailRenderer.snapshot(item)
-        case .image: return NSImage(contentsOf: item.contentURL)
+        case .image, .gif: return NSImage(contentsOf: item.contentURL)
+        case .slideshow: return firstSlideshowImage(item.contentURL)
         default:     return nil
         }
+    }
+
+    private static func firstSlideshowImage(_ folder: URL) -> NSImage? {
+        let exts: Set<String> = ["png", "jpg", "jpeg", "heic", "heif", "gif", "tiff", "tif", "bmp", "webp"]
+        let items = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+            .filter { exts.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        return items.first.flatMap { NSImage(contentsOf: $0) }
     }
 
     /// Look for a Lively preview/thumbnail file alongside the entry.
@@ -70,6 +79,19 @@ enum ThumbnailProvider {
         } catch {
             return nil
         }
+    }
+
+    /// Synchronously return an already-cached preview (memory or disk), without generating one.
+    /// For UI that can't await (e.g. building an NSMenu).
+    @MainActor
+    static func cachedImage(for item: WallpaperItem) -> NSImage? {
+        if let img = memory[item.id] { return img }
+        let diskURL = AppPaths.thumbnails.appendingPathComponent("\(item.id.uuidString).png")
+        if let data = try? Data(contentsOf: diskURL), let image = NSImage(data: data) {
+            memory[item.id] = image
+            return image
+        }
+        return nil
     }
 
     /// Invalidate a cached preview (e.g. when a wallpaper is removed).

@@ -9,10 +9,18 @@ final class AppModel: ObservableObject {
     let windowManager = WallpaperWindowManager()
     let library = LibraryStore()
     lazy var playback = PlaybackController(manager: windowManager)
+    /// Global cursor tracking - only active while an interactive (web/shader) wallpaper is up,
+    /// so video/image wallpapers (which ignore the cursor) cost nothing per mouse move.
+    private let mouseMonitor = GlobalMouseMonitor()
+    /// Desktop widgets overlay (clock / date / weather / now-playing).
+    let overlay = OverlayController()
+    var overlaySettings: OverlaySettings { overlay.settings }
 
     @Published private(set) var items: [WallpaperItem] = []
     @Published private(set) var currentItemID: UUID?
     @Published private(set) var isUserPaused = false
+    /// Which settings-window tab is shown (so the menu bar can open straight to Settings).
+    @Published var settingsTab = ProcessInfo.processInfo.environment["LUCIDWALL_TAB"] ?? "videos"
 
     // Energy preferences (persisted; all default off).
     @Published var pauseOnBattery = UserDefaults.standard.bool(forKey: "pauseOnBattery") {
@@ -23,6 +31,18 @@ final class AppModel: ObservableObject {
     }
     @Published var frameRateCapOnBattery = UserDefaults.standard.integer(forKey: "frameRateCapOnBattery") {
         didSet { UserDefaults.standard.set(frameRateCapOnBattery, forKey: "frameRateCapOnBattery"); playback.frameRateCapOnBattery = frameRateCapOnBattery }
+    }
+    /// Always-on frame-rate ceiling for animated wallpapers, 30–60 fps. Defaults to 30 - ample
+    /// for an ambient background and roughly half the GPU/CPU of 60. Capped at 60 by design.
+    @Published var wallpaperFrameRate = AppModel.loadFrameRate() {
+        didSet { UserDefaults.standard.set(wallpaperFrameRate, forKey: "wallpaperFrameRate"); windowManager.setBaseFrameRateCap(wallpaperFrameRate) }
+    }
+
+    static let frameRateOptions = [30, 45, 60]
+    private static func loadFrameRate() -> Int {
+        let v = intPref("wallpaperFrameRate", default: 30)
+        if frameRateOptions.contains(v) { return v }
+        return (v <= 0 || v > 60) ? 60 : 30   // migrate the old "Unlimited" (0) to the 60 cap
     }
 
     // Rotation / playlist (off by default).
@@ -76,6 +96,107 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(monitorMode.rawValue, forKey: "monitorMode"); windowManager.setMonitorMode(monitorMode) }
     }
 
+    /// The id of the wallpaper assigned to a display in Independent mode (nil = default).
+    func displayWallpaperID(_ displayID: CGDirectDisplayID) -> UUID? {
+        windowManager.displayAssignment(forDisplay: displayID)?.id
+    }
+
+    // MARK: Profiles (scenes)
+
+    var profiles: [WallpaperProfile] { library.profiles }
+
+    /// Capture the current setup (monitor mode + main wallpaper + per-display picks) as a profile.
+    func saveCurrentAsProfile(name: String) {
+        let perDisplay = windowManager.perDisplayItemIDs().reduce(into: [String: String]()) { acc, kv in
+            acc[String(kv.key)] = kv.value.uuidString
+        }
+        let profile = WallpaperProfile(name: name, monitorMode: monitorMode.rawValue,
+                                       mainItemID: currentItemID, perDisplay: perDisplay)
+        library.saveProfile(profile)
+        objectWillChange.send()
+    }
+
+    func applyProfile(_ profile: WallpaperProfile) {
+        let mode = MonitorMode(rawValue: profile.monitorMode) ?? .mirror
+        windowManager.clearPerDisplay()
+        monitorMode = mode
+        if let id = profile.mainItemID, let item = library.items.first(where: { $0.id == id }) {
+            apply(item, addToLibrary: false)
+        }
+        if mode == .independent {
+            for (displayStr, itemStr) in profile.perDisplay {
+                guard let displayID = CGDirectDisplayID(displayStr),
+                      let itemID = UUID(uuidString: itemStr),
+                      let item = library.items.first(where: { $0.id == itemID }) else { continue }
+                setDisplayWallpaper(item, displayID: displayID)
+            }
+        }
+        objectWillChange.send()
+    }
+
+    func deleteProfile(_ id: UUID) { library.deleteProfile(id); objectWillChange.send() }
+
+    // MARK: Playlist
+
+    var playlistEntries: [PlaylistEntry] { library.playlist }
+    func addToPlaylist(_ item: WallpaperItem) { library.addToPlaylist(item.id); syncPlaylist() }
+    func removeFromPlaylist(_ id: UUID) { library.removeFromPlaylist(id); syncPlaylist() }
+    func movePlaylist(from: IndexSet, to: Int) { library.movePlaylist(from: from, to: to); syncPlaylist() }
+    func setPlaylistSeconds(_ id: UUID, _ seconds: Int) { library.setPlaylistSeconds(id, seconds); syncPlaylist() }
+    private func syncPlaylist() { playlist.entries = library.playlist; objectWillChange.send() }
+
+    /// Run an automated apply (rotation/schedule) without it overwriting the per-Space
+    /// wallpaper the user chose for the current Space.
+    func suppressingPerSpaceRecording(_ body: () -> Void) {
+        perSpace.suppressRecording = true
+        body()
+        perSpace.suppressRecording = false
+    }
+
+    // MARK: AI shader generation
+
+    /// Generate a Metal shader wallpaper from a prompt, save it, and apply it.
+    func generateAIShader(prompt: String) async throws {
+        let shade = try await AIShaderService.generate(prompt: prompt)
+        let id = UUID()
+        let dir = AppPaths.library.appendingPathComponent(id.uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("shader.metal")
+        try shade.write(to: url, atomically: true, encoding: .utf8)
+        let title = prompt.split(separator: " ").prefix(4).joined(separator: " ")
+        let item = WallpaperItem(id: id, title: title.isEmpty ? "AI Shader" : title,
+                                 kind: .shader, contentURL: url, author: "AI",
+                                 desc: "AI-generated · “\(prompt)”")
+        apply(item, addToLibrary: true)
+    }
+
+    /// Assign a random library wallpaper to each display (Independent mode).
+    func shufflePerDisplay() {
+        let pool = library.items
+        guard !pool.isEmpty else { return }
+        if monitorMode != .independent { monitorMode = .independent }
+        for screen in NSScreen.screens {
+            if let item = pool.randomElement() { setDisplayWallpaper(item, displayID: screen.displayID) }
+        }
+        objectWillChange.send()
+    }
+
+    /// Apply a wallpaper to every display (switches back to Mirror and clears per-display picks).
+    func applyToAllDisplays(_ item: WallpaperItem, addToLibrary: Bool = false) {
+        windowManager.clearPerDisplay()
+        if monitorMode == .independent { monitorMode = .mirror }
+        apply(item, addToLibrary: addToLibrary)
+    }
+
+    /// Apply a wallpaper to a single display, leaving the others untouched (switches to
+    /// Independent mode so per-display assignments take effect).
+    func applyToDisplay(_ item: WallpaperItem, displayID: CGDirectDisplayID, addToLibrary: Bool = false) {
+        if addToLibrary { library.add(item) }
+        if monitorMode != .independent { monitorMode = .independent }
+        setDisplayWallpaper(item, displayID: displayID)
+        refresh()
+    }
+
     /// Assign a specific wallpaper to one display (Independent mode). Pass nil to clear.
     func setDisplayWallpaper(_ item: WallpaperItem?, displayID: CGDirectDisplayID) {
         if let item {
@@ -97,11 +218,92 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(nowPlayingEnabled, forKey: "nowPlayingEnabled"); systemFeeders.nowPlayingEnabled = nowPlayingEnabled }
     }
 
-    // Audio-reactive (off by default; needs mic permission).
-    lazy var audioFeeder = AudioFeeder(manager: windowManager)
-    @Published var audioReactiveEnabled = AppModel.boolPref("audioReactiveEnabled", default: false) {
-        didSet { UserDefaults.standard.set(audioReactiveEnabled, forKey: "audioReactiveEnabled"); audioFeeder.isEnabled = audioReactiveEnabled }
+    // Ambient context feed for web wallpapers: weather + time of day + system theme.
+    lazy var environment = EnvironmentFeeder(manager: windowManager)
+    @Published var weatherEffectsEnabled = AppModel.boolPref("weatherEffectsEnabled", default: true) {
+        didSet { UserDefaults.standard.set(weatherEffectsEnabled, forKey: "weatherEffectsEnabled"); environment.enabled = weatherEffectsEnabled }
     }
+    @Published var spaceParallaxEnabled = AppModel.boolPref("spaceParallaxEnabled", default: true) {
+        didSet { UserDefaults.standard.set(spaceParallaxEnabled, forKey: "spaceParallaxEnabled"); windowManager.parallaxOnSpaceChange = spaceParallaxEnabled }
+    }
+
+    // Pause wallpapers while these apps (bundle ids) are frontmost.
+    lazy var appRules = AppRuleController(manager: windowManager)
+    @Published var pauseForApps: [String] = UserDefaults.standard.stringArray(forKey: "pauseForApps") ?? [] {
+        didSet { UserDefaults.standard.set(pauseForApps, forKey: "pauseForApps"); appRules.blockedBundleIDs = Set(pauseForApps) }
+    }
+
+    func addPauseApp(_ bundleID: String) {
+        guard !bundleID.isEmpty, !pauseForApps.contains(bundleID) else { return }
+        pauseForApps.append(bundleID)
+    }
+    func removePauseApp(_ bundleID: String) { pauseForApps.removeAll { $0 == bundleID } }
+
+    // Activity-based pausing.
+    lazy var reduceMotion = ReduceMotionWatcher(manager: windowManager)
+    lazy var meeting = MeetingWatcher(manager: windowManager)
+    lazy var idle = IdleWatcher(manager: windowManager)
+
+    @Published var respectReduceMotion = AppModel.boolPref("respectReduceMotion", default: true) {
+        didSet { UserDefaults.standard.set(respectReduceMotion, forKey: "respectReduceMotion"); reduceMotion.enabled = respectReduceMotion }
+    }
+    @Published var pauseInMeetings = AppModel.boolPref("pauseInMeetings", default: false) {
+        didSet { UserDefaults.standard.set(pauseInMeetings, forKey: "pauseInMeetings"); meeting.enabled = pauseInMeetings }
+    }
+    @Published var pauseWhenIdle = AppModel.boolPref("pauseWhenIdle", default: false) {
+        didSet { UserDefaults.standard.set(pauseWhenIdle, forKey: "pauseWhenIdle"); idle.enabled = pauseWhenIdle }
+    }
+    @Published var idleMinutes = AppModel.intPref("idleMinutes", default: 5) {
+        didSet { UserDefaults.standard.set(idleMinutes, forKey: "idleMinutes"); idle.thresholdMinutes = idleMinutes }
+    }
+
+    // Global dim (0 = off ... 0.9). Driven by the slider and the dim hotkey.
+    private var lastDim = 0.5
+    @Published var wallpaperDim = UserDefaults.standard.double(forKey: "wallpaperDim") {
+        didSet { UserDefaults.standard.set(wallpaperDim, forKey: "wallpaperDim"); windowManager.setBaseDim(CGFloat(wallpaperDim)) }
+    }
+    func toggleDim() {
+        if wallpaperDim > 0.001 { lastDim = wallpaperDim; wallpaperDim = 0 }
+        else { wallpaperDim = lastDim > 0.001 ? lastDim : 0.5 }
+    }
+
+    /// Set by AppDelegate to show the command palette (bound to the ⌃⌥⌘Space hotkey).
+    var requestCommandPalette: (() -> Void)?
+
+    // Ambient audio + per-Space wallpapers.
+    let audio = AudioController()
+    let perSpace = PerSpaceController()
+    @Published var audioVolume = Float(UserDefaults.standard.double(forKey: "audioVolume")) {
+        didSet { UserDefaults.standard.set(Double(audioVolume), forKey: "audioVolume"); audio.volume = audioVolume; updateAudio() }
+    }
+    @Published var perSpaceEnabled = AppModel.boolPref("perSpaceEnabled", default: false) {
+        didSet { UserDefaults.standard.set(perSpaceEnabled, forKey: "perSpaceEnabled"); perSpace.enabled = perSpaceEnabled }
+    }
+
+    func setSound(_ url: URL?, for item: WallpaperItem) {
+        library.setSound(url, for: item.id)
+        if library.currentItemID == item.id { updateAudio() }
+        objectWillChange.send()
+    }
+    func soundURL(for item: WallpaperItem) -> URL? { library.soundURL(for: item.id) }
+
+    private func updateAudio() {
+        guard audioVolume > 0, !isUserPaused, let item = library.currentItem,
+              let url = library.soundURL(for: item.id), FileManager.default.fileExists(atPath: url.path) else {
+            audio.setSound(nil); return
+        }
+        audio.setSound(url)
+    }
+
+    // Updates & iCloud sync.
+    let cloud = iCloudSync()
+    @Published var iCloudSyncEnabled = AppModel.boolPref("iCloudSyncEnabled", default: false) {
+        didSet { UserDefaults.standard.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled"); cloud.enabled = iCloudSyncEnabled }
+    }
+    @Published var autoCheckUpdates = AppModel.boolPref("autoCheckUpdates", default: false) {
+        didSet { UserDefaults.standard.set(autoCheckUpdates, forKey: "autoCheckUpdates") }
+    }
+    func checkForUpdates() { UpdateChecker.check(manual: true) }
 
     static func intPref(_ key: String, default def: Int) -> Int {
         UserDefaults.standard.object(forKey: key) == nil ? def : UserDefaults.standard.integer(forKey: key)
@@ -112,7 +314,9 @@ final class AppModel: ObservableObject {
     }
 
     func start() {
+        seedBuiltInsIfNeeded()
         windowManager.monitorMode = monitorMode
+        windowManager.setBaseFrameRateCap(wallpaperFrameRate)
         windowManager.start()
         playback.pauseOnBattery = pauseOnBattery
         playback.pauseOnLowPowerMode = pauseOnLowPowerMode
@@ -120,13 +324,27 @@ final class AppModel: ObservableObject {
         playback.start()
         playlist.shuffle = rotationShuffle
         playlist.intervalSeconds = TimeInterval(max(1, rotationMinutes) * 60)
+        playlist.entries = library.playlist
         playlist.isEnabled = rotationEnabled
         applyHotkeys()
         reconfigureSchedule()
         systemFeeders.systemInfoEnabled = systemInfoEnabled
         systemFeeders.nowPlayingEnabled = nowPlayingEnabled
         systemFeeders.start()
-        if audioReactiveEnabled { audioFeeder.isEnabled = true }
+        environment.enabled = weatherEffectsEnabled
+        environment.start()
+        windowManager.parallaxOnSpaceChange = spaceParallaxEnabled
+        appRules.blockedBundleIDs = Set(pauseForApps)
+        appRules.start()
+        overlay.start()
+        reduceMotion.enabled = respectReduceMotion; reduceMotion.start()
+        meeting.enabled = pauseInMeetings; meeting.start()
+        idle.thresholdMinutes = idleMinutes; idle.enabled = pauseWhenIdle; idle.start()
+        windowManager.setBaseDim(CGFloat(wallpaperDim))
+        audio.volume = audioVolume
+        perSpace.model = self; perSpace.enabled = perSpaceEnabled; perSpace.start()
+        cloud.enabled = iCloudSyncEnabled
+        if autoCheckUpdates { UpdateChecker.check(manual: false) }
         refresh()
     }
 
@@ -135,9 +353,56 @@ final class AppModel: ObservableObject {
         playlist.stop()
         scheduler.stop()
         systemFeeders.stop()
-        audioFeeder.stop()
+        environment.stop()
+        appRules.stop()
+        overlay.stop()
+        reduceMotion.stop()
+        meeting.stop()
+        idle.stop()
+        audio.stop()
+        perSpace.stop()
+        mouseMonitor.stop()
         hotKeys.unregisterAll()
         windowManager.stop()
+    }
+
+    /// On first launch, populate the library with the bundled videos + interactive wallpapers
+    /// and pick a nice default. Idempotent via a UserDefaults flag and stable built-in UUIDs,
+    /// so a wallpaper the user later deletes is not re-added.
+    private func seedBuiltInsIfNeeded() {
+        let env = ProcessInfo.processInfo.environment
+        // Debug autostart / no-seed runs must not populate the library (keeps tests deterministic).
+        guard env["LUCIDWALL_AUTOSTART"] == nil, env["LUCIDWALL_NO_SEED"] == nil else { return }
+        let defaults = UserDefaults.standard
+        // Migrate the old boolean flag to a version number (v1 users already have the v1 set).
+        var seededVersion = defaults.integer(forKey: "seededBuiltinVersion")
+        let firstRun = seededVersion == 0 && !defaults.bool(forKey: "seededBuiltinsV1")
+        if seededVersion == 0 && defaults.bool(forKey: "seededBuiltinsV1") { seededVersion = 1 }
+
+        guard seededVersion < BuiltInWallpapers.currentSeedVersion else { return }
+        let toSeed = firstRun ? BuiltInWallpapers.items() : BuiltInWallpapers.items(newerThan: seededVersion)
+        guard !BuiltInWallpapers.items().isEmpty else { return }   // bundle not ready - retry next launch
+
+        for item in toSeed where !library.items.contains(where: { $0.id == item.id }) {
+            library.add(item)
+        }
+        if firstRun, library.currentItem == nil,
+           let def = BuiltInWallpapers.items().first(where: { $0.id == BuiltInWallpapers.defaultID }) {
+            library.setCurrent(def)
+        }
+        defaults.set(BuiltInWallpapers.currentSeedVersion, forKey: "seededBuiltinVersion")
+        defaults.set(true, forKey: "seededBuiltinsV1")
+    }
+
+    /// Start cursor tracking only for interactive wallpapers; stop it otherwise.
+    private func updateMouseTracking() {
+        if windowManager.hasInteractiveRenderer {
+            mouseMonitor.start { [weak self] location in
+                self?.windowManager.updateMouse(globalLocation: location)
+            }
+        } else {
+            mouseMonitor.stop()
+        }
     }
 
     var currentItem: WallpaperItem? { library.currentItem }
@@ -197,6 +462,7 @@ final class AppModel: ObservableObject {
     func setUserPaused(_ paused: Bool) {
         isUserPaused = paused
         windowManager.setPaused(paused, reason: .user)
+        paused ? audio.suspend() : audio.resume()
     }
 
     func togglePause() { setUserPaused(!isUserPaused) }
@@ -227,11 +493,12 @@ final class AppModel: ObservableObject {
     // MARK: Lively properties
 
     func propertyEntries(for item: WallpaperItem) -> [LivelyPropertyEntry] {
-        LivelyPropertySchema.load(item.propertiesURL)
+        item.kind == .shader ? LivelyPropertySchema.shaderEntries : LivelyPropertySchema.load(item.propertiesURL)
     }
 
     func resolvedProperties(for item: WallpaperItem) -> [String: LivelyValue] {
-        var values = LivelyPropertySchema.defaults(item.propertiesURL)
+        var values = item.kind == .shader ? LivelyPropertySchema.shaderDefaults
+                                           : LivelyPropertySchema.defaults(item.propertiesURL)
         for (key, value) in library.propertyOverrides(for: item.id) { values[key] = value }
         return values
     }
@@ -247,6 +514,38 @@ final class AppModel: ObservableObject {
         }
         objectWillChange.send()
     }
+
+    /// Randomize an interactive wallpaper's controls (sliders, colors, toggles, dropdowns).
+    func randomizeProperties(for item: WallpaperItem) {
+        for entry in propertyEntries(for: item) {
+            let p = entry.property
+            let value: LivelyValue?
+            switch p.type {
+            case "slider":
+                let lo = p.min ?? 0, hi = p.max ?? 1
+                let step = p.step ?? 0
+                var v = Double.random(in: lo...max(lo, hi))
+                if step > 0 { v = (v / step).rounded() * step }
+                value = .number(v)
+            case "color":
+                value = .string(String(format: "#%02X%02X%02X", Int.random(in: 0...255), Int.random(in: 0...255), Int.random(in: 0...255)))
+            case "checkbox":
+                value = .bool(Bool.random())
+            case "dropdown":
+                value = .number(Double(Int.random(in: 0..<max(1, (p.items ?? []).count))))
+            default:
+                value = nil
+            }
+            if let value { setProperty(entry.name, value: value, for: item) }
+        }
+    }
+
+    // MARK: Favorites & tags
+
+    func isFavorite(_ item: WallpaperItem) -> Bool { library.isFavorite(item.id) }
+    func toggleFavorite(_ item: WallpaperItem) { library.toggleFavorite(item.id); objectWillChange.send() }
+    func tags(for item: WallpaperItem) -> [String] { library.tags(for: item.id) }
+    func setTags(_ list: [String], for item: WallpaperItem) { library.setTags(list, for: item.id); objectWillChange.send() }
 
     // MARK: Video scaling
 
@@ -267,5 +566,13 @@ final class AppModel: ObservableObject {
     private func refresh() {
         items = library.items
         currentItemID = library.currentItemID
+        // System/now-playing feeds only matter to web wallpapers - let the feeder idle its
+        // timer entirely for video/image/shader wallpapers (the common case).
+        systemFeeders.contentHasWeb = windowManager.hasWebRenderer
+        environment.contentHasWeb = windowManager.hasWebRenderer
+        // Cursor tracking only when something actually uses it (web/shader).
+        updateMouseTracking()
+        updateAudio()
+        perSpace.rememberCurrent()
     }
 }

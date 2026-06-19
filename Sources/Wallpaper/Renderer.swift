@@ -30,10 +30,13 @@ protocol WallpaperRenderer: AnyObject {
     func setFrameRateCap(_ fps: Int)
 
     /// Lively data feeds (web renderers only): JSON for system info / now-playing, and a
-    /// normalized audio spectrum (128 bands).
+    /// combined "environment" payload (time of day, weather, theme accent / light-dark).
     func sendSystemInfo(_ json: String)
     func sendNowPlaying(_ json: String)
-    func sendAudio(_ bands: [Float])
+    func sendEnvironment(_ json: String)
+
+    /// A brief parallax nudge (e.g. on Space switch); renderers may ignore it.
+    func parallaxNudge(dx: CGFloat, dy: CGFloat)
 }
 
 extension WallpaperRenderer {
@@ -44,7 +47,20 @@ extension WallpaperRenderer {
     func setFrameRateCap(_ fps: Int) {}
     func sendSystemInfo(_ json: String) {}
     func sendNowPlaying(_ json: String) {}
-    func sendAudio(_ bands: [Float]) {}
+    func sendEnvironment(_ json: String) {}
+
+    /// Default parallax: a quick translate of the renderer's layer and back.
+    func parallaxNudge(dx: CGFloat, dy: CGFloat) {
+        guard let layer = view.layer else { return }
+        let anim = CAKeyframeAnimation(keyPath: "transform")
+        anim.values = [NSValue(caTransform3D: CATransform3DIdentity),
+                       NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0)),
+                       NSValue(caTransform3D: CATransform3DIdentity)]
+        anim.keyTimes = [0, 0.4, 1]
+        anim.duration = 0.9
+        anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(anim, forKey: "parallax")
+    }
 
     /// Capture what this renderer currently shows. Default renders the view's layers;
     /// WebRenderer overrides with WKWebView.takeSnapshot. Needs no system permission

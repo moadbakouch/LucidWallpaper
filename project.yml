@@ -41,7 +41,22 @@ targets:
         LD_RUNPATH_SEARCH_PATHS:
           - "$(inherited)"
           - "@executable_path/../Frameworks"
+    # Build the screensaver alongside the app (so it can be installed from Settings).
+    dependencies:
+      - target: LucidWallpaperSaver
+        link: false
+        embed: false
     postBuildScripts:
+      # Copy the built .saver into the app bundle so Settings can install it for the user.
+      - name: Embed screen saver
+        basedOnDependencyAnalysis: false
+        script: |
+          SAVER="$BUILT_PRODUCTS_DIR/LucidWallpaperSaver.saver"
+          DEST="$CODESIGNING_FOLDER_PATH/Contents/Resources"
+          if [ -d "$SAVER" ]; then
+            rm -rf "$DEST/LucidWallpaperSaver.saver"
+            /bin/cp -R "$SAVER" "$DEST/"
+          fi
       # iCloud Documents sync stamps files with com.apple.FinderInfo / fileprovider
       # xattrs that make codesign fail ("resource fork … not allowed"). Strip them from
       # the bundle right before Xcode's implicit signing step.
@@ -73,6 +88,8 @@ targets:
       - sdk: ScreenSaver.framework
       - sdk: AVFoundation.framework
       - sdk: WebKit.framework
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
     postBuildScripts:
       - name: Strip extended attributes before signing
         basedOnDependencyAnalysis: false

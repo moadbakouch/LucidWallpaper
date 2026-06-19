@@ -44,11 +44,17 @@ final class WebRenderer: NSObject, WallpaperRenderer {
     }
 
     func play() {
-        evaluate("if(window.livelyWallpaperPlaybackChanged){window.livelyWallpaperPlaybackChanged(false);}")
+        // Resume the rAF loop (hard stop, below) and notify Lively-aware wallpapers.
+        evaluate("if(window.__lucidwallpaperPause){window.__lucidwallpaperPause(false);}"
+               + "if(window.livelyWallpaperPlaybackChanged){window.livelyWallpaperPlaybackChanged(false);}")
     }
 
     func pause() {
-        evaluate("if(window.livelyWallpaperPlaybackChanged){window.livelyWallpaperPlaybackChanged(true);}")
+        // Freeze requestAnimationFrame so the page does no work while covered/paused - most
+        // wallpapers ignore livelyWallpaperPlaybackChanged, so the rAF freeze is what actually
+        // drops CPU/GPU to zero. We still fire the callback for wallpapers that honor it.
+        evaluate("if(window.__lucidwallpaperPause){window.__lucidwallpaperPause(true);}"
+               + "if(window.livelyWallpaperPlaybackChanged){window.livelyWallpaperPlaybackChanged(true);}")
     }
 
     func stop() {
@@ -127,20 +133,23 @@ final class WebRenderer: NSObject, WallpaperRenderer {
         evaluate("if(window.livelyCurrentTrack){window.livelyCurrentTrack(\(json));}")
     }
 
-    func sendAudio(_ bands: [Float]) {
+    func sendEnvironment(_ json: String) {
         guard isLoaded else { return }
-        let array = "[" + bands.map { String(format: "%.3f", $0) }.joined(separator: ",") + "]"
-        evaluate("if(window.livelyAudioListener){window.livelyAudioListener(\(array));}")
+        evaluate("window.lucidEnvironment=\(json);if(window.livelyEnvironment){window.livelyEnvironment(\(json));}")
     }
 
-    /// Wraps requestAnimationFrame so the wallpaper can be throttled to a target FPS.
+    /// Wraps requestAnimationFrame so the wallpaper can be (a) throttled to a target FPS and
+    /// (b) hard-frozen while paused. When paused we hold pending callbacks instead of
+    /// scheduling them, which stalls the animation loop and drops CPU/GPU to zero; resuming
+    /// replays the held callbacks to restart it.
     private static let fpsCapShim = """
     (function(){
-      var cap = 0, last = 0;
+      var cap = 0, last = 0, paused = false, held = [];
       var raf = window.requestAnimationFrame
         ? window.requestAnimationFrame.bind(window)
         : function(cb){ return setTimeout(function(){ cb(performance.now()); }, 16); };
       window.requestAnimationFrame = function(cb){
+        if (paused) { held.push(cb); return 0; }
         if (cap <= 0) { return raf(cb); }
         var interval = 1000 / cap;
         return raf(function(t){
@@ -149,6 +158,12 @@ final class WebRenderer: NSObject, WallpaperRenderer {
         });
       };
       window.__lucidwallpaperSetFPSCap = function(n){ cap = n || 0; };
+      window.__lucidwallpaperPause = function(p){
+        p = !!p;
+        if (p === paused) { return; }
+        paused = p;
+        if (!paused) { var q = held; held = []; q.forEach(function(cb){ window.requestAnimationFrame(cb); }); }
+      };
     })();
     """
 }

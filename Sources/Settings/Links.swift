@@ -12,7 +12,7 @@ enum WallpaperSources {
 
     static let all: [Source] = [
         .init(title: "Lively Wallpaper (official)",
-              subtitle: "livelywallpaper.io — animated & interactive wallpapers",
+              subtitle: "livelywallpaper.io - animated & interactive wallpapers",
               url: URL(string: "https://www.livelywallpaper.io/")!),
         .init(title: "rocksdanister.com/lively",
               subtitle: "The original project site",
@@ -53,7 +53,7 @@ struct GetWallpapersView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Get Wallpapers").font(.headline)
-            Text("Download Lively packages (.zip), then use Import — they run unchanged.")
+            Text("Download Lively packages (.zip), then use Import - they run unchanged.")
                 .font(.caption).foregroundStyle(.secondary)
             ForEach(WallpaperSources.all) { LinkRow(source: $0) }
         }

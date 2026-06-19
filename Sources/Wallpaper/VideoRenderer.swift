@@ -67,7 +67,7 @@ final class VideoRenderer: NSObject, WallpaperRenderer {
         let scale = host.window?.backingScaleFactor ?? 2
         host.layer?.contentsScale = scale
         playerLayer.contentsScale = scale
-        // Use bounds + position (NOT frame) because we apply a non-identity zoom transform —
+        // Use bounds + position (NOT frame) because we apply a non-identity zoom transform -
         // setting `frame` with a live transform mis-sizes the layer on resize.
         playerLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         playerLayer.bounds = CGRect(origin: .zero, size: host.bounds.size)

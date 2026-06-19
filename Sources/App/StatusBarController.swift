@@ -31,6 +31,7 @@ final class StatusBarController: NSObject {
         menu.removeAllItems()
 
         addItem(to: menu, title: "Open LucidWallpaper…", action: #selector(showLibrary))
+        addItem(to: menu, title: "Settings…", action: #selector(showSettingsTab), key: ",")
         menu.addItem(.separator())
         addItem(to: menu, title: "Import Lively Wallpaper…", action: #selector(importLively))
         addItem(to: menu, title: "Set Video Wallpaper…", action: #selector(chooseVideo))
@@ -47,6 +48,11 @@ final class StatusBarController: NSObject {
                 mi.target = self
                 mi.representedObject = item.id.uuidString
                 mi.state = (model.currentItemID == item.id) ? .on : .off
+                if let thumb = ThumbnailProvider.cachedImage(for: item) {
+                    mi.image = Self.menuThumbnail(thumb)
+                } else {
+                    Task { _ = await ThumbnailProvider.image(for: item) }   // warm cache for next open
+                }
                 menu.addItem(mi)
             }
         }
@@ -71,6 +77,7 @@ final class StatusBarController: NSObject {
         launch.state = model.launchAtLogin ? .on : .off
 
         menu.addItem(.separator())
+        addItem(to: menu, title: "Check for Updates…", action: #selector(checkUpdates))
         addItem(to: menu, title: "Quit LucidWallpaper", action: #selector(quit), key: "q")
     }
 
@@ -84,7 +91,8 @@ final class StatusBarController: NSObject {
 
     // MARK: Actions
 
-    @objc private func showLibrary() { openSettings() }
+    @objc private func showLibrary() { model.settingsTab = "videos"; openSettings() }
+    @objc private func showSettingsTab() { model.settingsTab = "settings"; openSettings() }
 
     @objc private func importLively() {
         let panel = NSOpenPanel()
@@ -143,11 +151,29 @@ final class StatusBarController: NSObject {
         model.launchAtLogin.toggle()
     }
 
+    @objc private func checkUpdates() { model.checkForUpdates() }
+
     @objc private func quit() {
         NSApp.terminate(nil)
     }
 
     // MARK: Helpers
+
+    /// A small aspect-fill thumbnail for a menu item.
+    private static func menuThumbnail(_ image: NSImage) -> NSImage {
+        let size = NSSize(width: 36, height: 22)
+        let out = NSImage(size: size)
+        out.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        let imgSize = image.size
+        guard imgSize.width > 0, imgSize.height > 0 else { out.unlockFocus(); return image }
+        let scale = max(size.width / imgSize.width, size.height / imgSize.height)
+        let drawSize = NSSize(width: imgSize.width * scale, height: imgSize.height * scale)
+        let origin = NSPoint(x: (size.width - drawSize.width) / 2, y: (size.height - drawSize.height) / 2)
+        image.draw(in: NSRect(origin: origin, size: drawSize))
+        out.unlockFocus()
+        return out
+    }
 
     private func pickFile(types: [UTType]) -> URL? {
         let panel = NSOpenPanel()

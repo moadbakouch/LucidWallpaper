@@ -9,9 +9,12 @@ import QuartzCore
 final class SystemFeeders {
     private let manager: WallpaperWindowManager
     private var timer: Timer?
+    private var started = false
 
-    var systemInfoEnabled = true
-    var nowPlayingEnabled = true
+    var systemInfoEnabled = true { didSet { refreshTimer() } }
+    var nowPlayingEnabled = true { didSet { refreshTimer() } }
+    /// Whether a web wallpaper (the only consumer of these feeds) is currently loaded.
+    var contentHasWeb = false { didSet { refreshTimer() } }
 
     private var prevCPU: host_cpu_load_info?
     private var prevNet: (rx: UInt64, tx: UInt64, time: CFTimeInterval)?
@@ -21,19 +24,37 @@ final class SystemFeeders {
     }
 
     func start() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
-        }
+        started = true
+        refreshTimer()
     }
 
     func stop() {
+        started = false
         timer?.invalidate()
         timer = nil
     }
 
+    /// Run the 1 Hz timer only when it can do something useful: started, a feed enabled, and a
+    /// web wallpaper present. For video/image/shader wallpapers it stays fully idle (no wakeups).
+    private func refreshTimer() {
+        let shouldRun = started && contentHasWeb && (systemInfoEnabled || nowPlayingEnabled)
+        if shouldRun {
+            guard timer == nil else { return }
+            let t = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+                Task { @MainActor in self?.tick() }
+            }
+            t.tolerance = 0.2
+            RunLoop.main.add(t, forMode: .common)
+            timer = t
+        } else {
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
     private func tick() {
-        guard manager.hasWebRenderer else { return }
+        // Only do work when a web wallpaper is actually running and on-screen.
+        guard manager.hasActiveWebRenderer else { return }
         if systemInfoEnabled {
             let net = networkBytesPerSec()
             let json = """

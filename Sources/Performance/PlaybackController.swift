@@ -74,7 +74,7 @@ final class PlaybackController {
         manager.setPaused(pause, reason: .battery)
 
         let cap = (onBattery && frameRateCapOnBattery > 0) ? frameRateCapOnBattery : 0
-        manager.setFrameRateCap(cap)
+        manager.setEnergyFrameRateCap(cap)
     }
 
     private func isOnBattery() -> Bool {
