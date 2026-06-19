@@ -52,6 +52,9 @@ final class PerSpaceController {
         return id == 0 ? nil : id
     }
 
+    /// Debug: the current Space ID (nil if unsupported); used by the feature test.
+    func debugSpaceID() -> UInt64? { Self.currentSpaceID() }
+
     private static func loadFn<T>(_ name: String, _ type: T.Type) -> T? {
         guard let p = dlsym(UnsafeMutableRawPointer(bitPattern: -2), name) else { return nil }   // RTLD_DEFAULT
         return unsafeBitCast(p, to: T.self)

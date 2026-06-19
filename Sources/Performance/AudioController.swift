@@ -27,4 +27,7 @@ final class AudioController {
     func suspend() { suspended = true; player?.pause() }
     func resume() { suspended = false; if volume > 0 { player?.play() } }
     func stop() { player?.stop(); player = nil; currentURL = nil; suspended = false }
+
+    /// Debug: whether a sound is actively playing; used by the feature test.
+    var debugIsPlaying: Bool { player?.isPlaying ?? false }
 }

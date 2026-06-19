@@ -88,6 +88,9 @@ final class WallpaperWindowManager {
     func setBaseDim(_ level: CGFloat) { baseDim = level; applyDim() }
     func setIdleDim(_ level: CGFloat) { idleDim = level; applyDim() }
     private func applyDim() { for entry in entries { entry.window.setDim(effectiveDim) } }
+
+    /// Debug: dim overlay alpha on the first window (-1 if none); used by the feature test.
+    var debugFirstDimAlpha: CGFloat { entries.first?.window.dimView.alphaValue ?? -1 }
     /// Global pause reasons (user / system / battery). Occlusion is per-display, not here.
     private var pauseReasons: Set<PauseReason> = []
     private var globalPaused: Bool { !pauseReasons.isEmpty }

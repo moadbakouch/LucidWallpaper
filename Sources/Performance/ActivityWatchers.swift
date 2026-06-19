@@ -81,6 +81,9 @@ final class IdleWatcher {
         if paused { paused = false; manager.setPaused(false, reason: .idle) }
     }
 
+    /// Debug: whether the poll timer is running; used by the feature test.
+    var debugRunning: Bool { timer != nil }
+
     /// Poll only while both started (app running) and enabled (user setting).
     private func refresh() {
         guard started && enabled else {

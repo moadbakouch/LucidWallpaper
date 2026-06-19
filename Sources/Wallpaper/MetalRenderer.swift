@@ -141,6 +141,61 @@ final class MetalRenderer: NSObject, WallpaperRenderer {
         cmd.commit()
     }
 
+    /// Capture the current frame. A CAMetalLayer can't be read via `cacheDisplay` (the default
+    /// renderer snapshot), so render one frame into an offscreen readable texture and read it
+    /// back. Powers shader/AI-wallpaper thumbnails and the snapshot debug hook.
+    func snapshot(_ completion: @escaping (NSImage?) -> Void) {
+        guard let device, let queue, let pipeline else { completion(nil); return }
+        var w = Int(metalLayer.drawableSize.width), h = Int(metalLayer.drawableSize.height)
+        if w <= 0 || h <= 0 { w = 640; h = 360 }                  // not yet laid out (offscreen)
+        let cap = 1280
+        if max(w, h) > cap { let s = Double(cap) / Double(max(w, h)); w = max(1, Int(Double(w) * s)); h = max(1, Int(Double(h) * s)) }
+
+        // Render to a private render target (GPU-only, like a drawable), then blit to a shared
+        // texture for CPU readback. Rendering straight to a .shared texture doesn't reliably land.
+        let rtDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
+        rtDesc.usage = [.renderTarget]; rtDesc.storageMode = .private
+        let readDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
+        readDesc.usage = [.shaderRead]; readDesc.storageMode = .shared
+        guard let rt = device.makeTexture(descriptor: rtDesc),
+              let readTex = device.makeTexture(descriptor: readDesc) else { completion(nil); return }
+
+        var u = Uniforms(res: SIMD2(Float(w), Float(h)),
+                         time: Float(CACurrentMediaTime() - startTime) * speed,
+                         mouse: mouse, brightness: brightness)
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = rt
+        pass.colorAttachments[0].loadAction = .clear
+        pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        pass.colorAttachments[0].storeAction = .store
+        guard let cmd = queue.makeCommandBuffer(),
+              let enc = cmd.makeRenderCommandEncoder(descriptor: pass) else { completion(nil); return }
+        enc.setRenderPipelineState(pipeline)
+        enc.setFragmentBytes(&u, length: MemoryLayout<Uniforms>.stride, index: 0)
+        enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        enc.endEncoding()
+        guard let blit = cmd.makeBlitCommandEncoder() else { completion(nil); return }
+        blit.copy(from: rt, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+                  sourceSize: MTLSize(width: w, height: h, depth: 1),
+                  to: readTex, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
+        blit.endEncoding()
+        cmd.commit()
+        cmd.waitUntilCompleted()   // one-off on-demand capture; brief GPU wait, off the hot path
+        let bytesPerRow = w * 4
+        var raw = [UInt8](repeating: 0, count: bytesPerRow * h)
+        readTex.getBytes(&raw, bytesPerRow: bytesPerRow, from: MTLRegionMake2D(0, 0, w, h), mipmapLevel: 0)
+        completion(MetalRenderer.image(bgra: raw, width: w, height: h))
+    }
+
+    nonisolated private static func image(bgra: [UInt8], width: Int, height: Int) -> NSImage? {
+        var data = bgra
+        let info = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        guard let ctx = CGContext(data: &data, width: width, height: height, bitsPerComponent: 8,
+                                  bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: info), let cg = ctx.makeImage() else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: width, height: height))
+    }
+
     private func buildPipeline(shade: String) {
         guard let device else { return }
         let source = Self.shaderHeader + "\n" + shade + "\n" + Self.shaderFooter

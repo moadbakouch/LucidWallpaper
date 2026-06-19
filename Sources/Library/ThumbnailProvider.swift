@@ -39,6 +39,7 @@ enum ThumbnailProvider {
         switch item.kind {
         case .video: return await videoFrame(item.contentURL)
         case .web:   return await WebThumbnailRenderer.snapshot(item)
+        case .shader: return await ShaderThumbnail.snapshot(item)
         case .image, .gif: return NSImage(contentsOf: item.contentURL)
         case .slideshow: return firstSlideshowImage(item.contentURL)
         default:     return nil
@@ -99,6 +100,20 @@ enum ThumbnailProvider {
     static func invalidate(_ id: UUID) {
         memory[id] = nil
         try? FileManager.default.removeItem(at: AppPaths.thumbnails.appendingPathComponent("\(id.uuidString).png"))
+    }
+}
+
+/// Renders a shader wallpaper's first frame offscreen for library previews.
+@MainActor
+private enum ShaderThumbnail {
+    static func snapshot(_ item: WallpaperItem) async -> NSImage? {
+        let renderer = MetalRenderer()
+        renderer.load(item)
+        let image = await withCheckedContinuation { (cont: CheckedContinuation<NSImage?, Never>) in
+            renderer.snapshot { cont.resume(returning: $0) }
+        }
+        renderer.stop()
+        return image
     }
 }
 

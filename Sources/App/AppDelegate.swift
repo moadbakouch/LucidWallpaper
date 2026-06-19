@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var settingsWindow: SettingsWindowController!
     private var onboarding: OnboardingWindowController?
     private var commandPalette: CommandPaletteController?
+    private var featureTest: FeatureSelfTest?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.start()
@@ -59,6 +60,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 for item in model.items { _ = await ThumbnailProvider.image(for: item) }
                 NSLog("[LucidWallpaper] thumbnails generated for %d items", model.items.count)
             }
+        }
+
+        if ProcessInfo.processInfo.environment["LUCIDWALL_FEATURE_TEST"] != nil {
+            let test = FeatureSelfTest(model: model)
+            featureTest = test
+            test.run()
         }
     }
 

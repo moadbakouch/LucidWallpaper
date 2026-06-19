@@ -37,6 +37,11 @@ protocol WallpaperRenderer: AnyObject {
 
     /// A brief parallax nudge (e.g. on Space switch); renderers may ignore it.
     func parallaxNudge(dx: CGFloat, dy: CGFloat)
+
+    /// Capture what this renderer currently shows (for previews/thumbnails). Declared here so
+    /// renderer-specific overrides (Metal offscreen render, WKWebView.takeSnapshot) dispatch
+    /// dynamically rather than always hitting the cacheDisplay default below.
+    func snapshot(_ completion: @escaping (NSImage?) -> Void)
 }
 
 extension WallpaperRenderer {
