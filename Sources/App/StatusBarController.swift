@@ -27,59 +27,119 @@ final class StatusBarController: NSObject {
 
     // MARK: Menu construction
 
+    /// Debug: build the menu into a throwaway and log its top-level structure (verifies the
+    /// submenus + the in-menu slider construct without crashing).
+    func debugDumpMenu() {
+        let m = NSMenu()
+        rebuildMenu(m)
+        let titles = m.items.map { $0.title.isEmpty ? "<slider/sep>" : ($0.submenu != nil ? "\($0.title)▸" : $0.title) }
+        NSLog("[MENUDUMP] %@", titles.joined(separator: " | "))
+    }
+
     private func rebuildMenu(_ menu: NSMenu) {
         menu.removeAllItems()
 
         addItem(to: menu, title: "Open LucidWallpaper…", action: #selector(showLibrary))
-        addItem(to: menu, title: "Settings…", action: #selector(showSettingsTab), key: ",")
         menu.addItem(.separator())
-        addItem(to: menu, title: "Import Lively Wallpaper…", action: #selector(importLively))
-        addItem(to: menu, title: "Set Video Wallpaper…", action: #selector(chooseVideo))
-        addItem(to: menu, title: "Set Web Wallpaper…", action: #selector(chooseWeb))
-        addItem(to: menu, title: "Show Interactive Sample", action: #selector(showSample))
 
-        if !model.items.isEmpty {
-            menu.addItem(.separator())
-            let header = NSMenuItem(title: "Library", action: nil, keyEquivalent: "")
-            header.isEnabled = false
-            menu.addItem(header)
-            for item in model.items {
-                let mi = NSMenuItem(title: item.title, action: #selector(applyLibraryItem(_:)), keyEquivalent: "")
-                mi.target = self
-                mi.representedObject = item.id.uuidString
-                mi.state = (model.currentItemID == item.id) ? .on : .off
-                if let thumb = ThumbnailProvider.cachedImage(for: item) {
-                    mi.image = Self.menuThumbnail(thumb)
-                } else {
-                    Task { _ = await ThumbnailProvider.image(for: item) }   // warm cache for next open
+        let header = NSMenuItem(title: model.currentItem?.title ?? "No wallpaper", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+        let pause = addItem(to: menu, title: model.isUserPaused ? "Resume Wallpaper" : "Pause Wallpaper",
+                            action: #selector(togglePause), key: "p")
+        pause.isEnabled = model.hasWallpaper
+        menu.addItem(switchSubmenu())
+
+        menu.addItem(.separator())
+        menu.addItem(soundSubmenu())
+        menu.addItem(addSubmenu())
+
+        menu.addItem(.separator())
+        addItem(to: menu, title: "Settings…", action: #selector(showSettingsTab), key: ",")
+        addItem(to: menu, title: "Send Feedback…", action: #selector(sendFeedback))
+        addItem(to: menu, title: "Quit LucidWallpaper", action: #selector(quit), key: "q")
+    }
+
+    // MARK: Submenus (kept out of the top level to keep it uncluttered)
+
+    private func submenu(_ title: String, image: String, _ build: (NSMenu) -> Void) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.image = NSImage(systemSymbolName: image, accessibilityDescription: nil)
+        let sub = NSMenu()
+        build(sub)
+        item.submenu = sub
+        return item
+    }
+
+    private func switchSubmenu() -> NSMenuItem {
+        submenu("Switch Wallpaper", image: "rectangle.stack") { menu in
+            let next = addItem(to: menu, title: "Next", action: #selector(nextWallpaper), key: "]"); next.isEnabled = model.canCycle
+            let prev = addItem(to: menu, title: "Previous", action: #selector(previousWallpaper), key: "["); prev.isEnabled = model.canCycle
+            let rand = addItem(to: menu, title: "Random", action: #selector(randomWallpaper), key: "r"); rand.isEnabled = model.items.count > 1
+            if !model.items.isEmpty {
+                menu.addItem(.separator())
+                for item in model.items {
+                    let mi = NSMenuItem(title: item.title, action: #selector(applyLibraryItem(_:)), keyEquivalent: "")
+                    mi.target = self
+                    mi.representedObject = item.id.uuidString
+                    mi.state = (model.currentItemID == item.id) ? .on : .off
+                    if let thumb = ThumbnailProvider.cachedImage(for: item) { mi.image = Self.menuThumbnail(thumb) }
+                    else { Task { _ = await ThumbnailProvider.image(for: item) } }
+                    menu.addItem(mi)
                 }
-                menu.addItem(mi)
+            }
+            menu.addItem(.separator())
+            addItem(to: menu, title: "Remove Wallpaper", action: #selector(removeWallpaper))
+        }
+    }
+
+    private func addSubmenu() -> NSMenuItem {
+        submenu("Add Wallpaper", image: "plus") { menu in
+            addItem(to: menu, title: "Set Video…", action: #selector(chooseVideo))
+            addItem(to: menu, title: "Set Web Page…", action: #selector(chooseWeb))
+            addItem(to: menu, title: "Import Lively Package…", action: #selector(importLively))
+            menu.addItem(.separator())
+            addItem(to: menu, title: "Show Interactive Sample", action: #selector(showSample))
+        }
+    }
+
+    /// Ambient-sound controls. There is only one ambient sound (the current wallpaper's), so it
+    /// can't overlap or differ per screen - this just mutes / sets the level for that one sound.
+    private func soundSubmenu() -> NSMenuItem {
+        submenu("Sound", image: model.audioMuted ? "speaker.slash" : "speaker.wave.2") { menu in
+            let current = model.currentItem.flatMap { model.soundURL(for: $0) }
+            let name = current.map { SystemSounds.displayName(for: $0) ?? $0.lastPathComponent } ?? "No ambient sound"
+            let nameItem = NSMenuItem(title: name, action: nil, keyEquivalent: "")
+            nameItem.isEnabled = false
+            menu.addItem(nameItem)
+            menu.addItem(.separator())
+            let mute = addItem(to: menu, title: "Mute", action: #selector(toggleMute))
+            mute.state = model.audioMuted ? .on : .off
+            menu.addItem(volumeItem())
+            if current != nil {
+                menu.addItem(.separator())
+                addItem(to: menu, title: "Remove Sound", action: #selector(removeSound))
             }
         }
+    }
 
-        menu.addItem(.separator())
-
-        let pause = addItem(to: menu, title: model.isUserPaused ? "Resume" : "Pause", action: #selector(togglePause), key: "p")
-        pause.isEnabled = model.hasWallpaper
-        let next = addItem(to: menu, title: "Next Wallpaper", action: #selector(nextWallpaper), key: "]")
-        next.isEnabled = model.canCycle
-        let prev = addItem(to: menu, title: "Previous Wallpaper", action: #selector(previousWallpaper), key: "[")
-        prev.isEnabled = model.canCycle
-        let rand = addItem(to: menu, title: "Random Wallpaper", action: #selector(randomWallpaper), key: "r")
-        rand.isEnabled = model.items.count > 1
-        addItem(to: menu, title: "Remove Wallpaper", action: #selector(removeWallpaper))
-
-        menu.addItem(.separator())
-
-        let battery = addItem(to: menu, title: "Pause on Battery", action: #selector(toggleBattery))
-        battery.state = model.pauseOnBattery ? .on : .off
-        let launch = addItem(to: menu, title: "Launch at Login", action: #selector(toggleLaunch))
-        launch.state = model.launchAtLogin ? .on : .off
-
-        menu.addItem(.separator())
-        addItem(to: menu, title: "Send Feedback…", action: #selector(sendFeedback))
-        addItem(to: menu, title: "Check for Updates…", action: #selector(checkUpdates))
-        addItem(to: menu, title: "Quit LucidWallpaper", action: #selector(quit), key: "q")
+    /// An in-menu volume slider for the ambient sound.
+    private func volumeItem() -> NSMenuItem {
+        let item = NSMenuItem()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: 26))
+        let icon = NSImageView(frame: NSRect(x: 14, y: 5, width: 16, height: 16))
+        icon.image = NSImage(systemSymbolName: "speaker.wave.2.fill", accessibilityDescription: nil)
+        icon.contentTintColor = .secondaryLabelColor
+        let slider = NSSlider(frame: NSRect(x: 36, y: 3, width: 168, height: 20))
+        slider.minValue = 0; slider.maxValue = 1
+        slider.doubleValue = Double(model.audioVolume)
+        slider.isContinuous = true
+        slider.target = self
+        slider.action = #selector(volumeChanged(_:))
+        container.addSubview(icon)
+        container.addSubview(slider)
+        item.view = container
+        return item
     }
 
     @discardableResult
@@ -144,16 +204,10 @@ final class StatusBarController: NSObject {
         model.clear()
     }
 
-    @objc private func toggleBattery() {
-        model.pauseOnBattery.toggle()
-    }
-
-    @objc private func toggleLaunch() {
-        model.launchAtLogin.toggle()
-    }
-
     @objc private func sendFeedback() { model.requestFeedback?() }
-    @objc private func checkUpdates() { model.checkForUpdates() }
+    @objc private func toggleMute() { model.toggleMute() }
+    @objc private func removeSound() { if let item = model.currentItem { model.setSound(nil, for: item) } }
+    @objc private func volumeChanged(_ sender: NSSlider) { model.audioVolume = Float(sender.doubleValue) }
 
     @objc private func quit() {
         NSApp.terminate(nil)

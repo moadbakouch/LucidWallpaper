@@ -454,8 +454,9 @@ struct SoundPicker: View {
             Button { pickCustom() } label: { Label("Custom Sound…", systemImage: "folder") }
                 .controlSize(.small)
 
-            Text("Plays a looping ambient sound while this wallpaper is active. The macOS sounds come "
-                 + "from your system. Adjust or mute the overall level in Settings → Live Effects.")
+            Text("Only one ambient sound plays at a time - the current wallpaper's - so it never "
+                 + "overlaps or differs per screen. The macOS sounds come from your system. Mute or "
+                 + "set the level from the menu bar (Sound) or Settings → Live Effects.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .id(item.id)

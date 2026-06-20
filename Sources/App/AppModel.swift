@@ -303,6 +303,13 @@ final class AppModel: ObservableObject {
     @Published var audioVolume = Float(UserDefaults.standard.double(forKey: "audioVolume")) {
         didSet { UserDefaults.standard.set(Double(audioVolume), forKey: "audioVolume"); audio.volume = audioVolume; updateAudio() }
     }
+    private var lastAudioVolume: Float = 0.5
+    var audioMuted: Bool { audioVolume <= 0.001 }
+    /// Mute / unmute the single ambient sound (remembers the prior level).
+    func toggleMute() {
+        if audioVolume > 0.001 { lastAudioVolume = audioVolume; audioVolume = 0 }
+        else { audioVolume = lastAudioVolume > 0.001 ? lastAudioVolume : 0.5 }
+    }
     @Published var perSpaceEnabled = AppModel.boolPref("perSpaceEnabled", default: false) {
         didSet { UserDefaults.standard.set(perSpaceEnabled, forKey: "perSpaceEnabled"); perSpace.enabled = perSpaceEnabled }
     }
