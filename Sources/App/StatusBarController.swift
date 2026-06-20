@@ -51,7 +51,17 @@ final class StatusBarController: NSObject {
         menu.addItem(switchSubmenu())
 
         menu.addItem(.separator())
-        menu.addItem(soundSubmenu())
+        // Ambient-sound controls, inline (only when the current wallpaper has a sound). There's
+        // one ambient sound at a time, so this slider/mute always controls that single sound.
+        if let item = model.currentItem, let url = model.soundURL(for: item) {
+            let name = SystemSounds.displayName(for: url) ?? url.lastPathComponent
+            let label = NSMenuItem(title: "Sound: \(name)", action: nil, keyEquivalent: "")
+            label.isEnabled = false
+            menu.addItem(label)
+            menu.addItem(volumeItem())
+            addItem(to: menu, title: "Remove Sound", action: #selector(removeSound))
+            menu.addItem(.separator())
+        }
         menu.addItem(addSubmenu())
 
         menu.addItem(.separator())
@@ -103,42 +113,31 @@ final class StatusBarController: NSObject {
         }
     }
 
-    /// Ambient-sound controls. There is only one ambient sound (the current wallpaper's), so it
-    /// can't overlap or differ per screen - this just mutes / sets the level for that one sound.
-    private func soundSubmenu() -> NSMenuItem {
-        submenu("Sound", image: model.audioMuted ? "speaker.slash" : "speaker.wave.2") { menu in
-            let current = model.currentItem.flatMap { model.soundURL(for: $0) }
-            let name = current.map { SystemSounds.displayName(for: $0) ?? $0.lastPathComponent } ?? "No ambient sound"
-            let nameItem = NSMenuItem(title: name, action: nil, keyEquivalent: "")
-            nameItem.isEnabled = false
-            menu.addItem(nameItem)
-            menu.addItem(.separator())
-            let mute = addItem(to: menu, title: "Mute", action: #selector(toggleMute))
-            mute.state = model.audioMuted ? .on : .off
-            menu.addItem(volumeItem())
-            if current != nil {
-                menu.addItem(.separator())
-                addItem(to: menu, title: "Remove Sound", action: #selector(removeSound))
-            }
-        }
-    }
+    private weak var volumeSlider: NSSlider?
+    private weak var muteButton: NSButton?
+    private var muteSymbol: String { model.audioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill" }
 
-    /// An in-menu volume slider for the ambient sound.
+    /// An inline volume slider with a clickable speaker that mutes/unmutes the one ambient sound.
     private func volumeItem() -> NSMenuItem {
         let item = NSMenuItem()
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: 26))
-        let icon = NSImageView(frame: NSRect(x: 14, y: 5, width: 16, height: 16))
-        icon.image = NSImage(systemSymbolName: "speaker.wave.2.fill", accessibilityDescription: nil)
-        icon.contentTintColor = .secondaryLabelColor
-        let slider = NSSlider(frame: NSRect(x: 36, y: 3, width: 168, height: 20))
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 232, height: 26))
+        let button = NSButton(frame: NSRect(x: 12, y: 3, width: 22, height: 20))
+        button.isBordered = false
+        button.imagePosition = .imageOnly
+        button.image = NSImage(systemSymbolName: muteSymbol, accessibilityDescription: "Mute")
+        button.target = self
+        button.action = #selector(toggleMute)
+        let slider = NSSlider(frame: NSRect(x: 40, y: 3, width: 180, height: 20))
         slider.minValue = 0; slider.maxValue = 1
         slider.doubleValue = Double(model.audioVolume)
         slider.isContinuous = true
         slider.target = self
         slider.action = #selector(volumeChanged(_:))
-        container.addSubview(icon)
+        container.addSubview(button)
         container.addSubview(slider)
         item.view = container
+        volumeSlider = slider
+        muteButton = button
         return item
     }
 
@@ -205,9 +204,16 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func sendFeedback() { model.requestFeedback?() }
-    @objc private func toggleMute() { model.toggleMute() }
+    @objc private func toggleMute() {
+        model.toggleMute()
+        volumeSlider?.doubleValue = Double(model.audioVolume)
+        muteButton?.image = NSImage(systemSymbolName: muteSymbol, accessibilityDescription: "Mute")
+    }
     @objc private func removeSound() { if let item = model.currentItem { model.setSound(nil, for: item) } }
-    @objc private func volumeChanged(_ sender: NSSlider) { model.audioVolume = Float(sender.doubleValue) }
+    @objc private func volumeChanged(_ sender: NSSlider) {
+        model.audioVolume = Float(sender.doubleValue)
+        muteButton?.image = NSImage(systemSymbolName: muteSymbol, accessibilityDescription: "Mute")
+    }
 
     @objc private func quit() {
         NSApp.terminate(nil)

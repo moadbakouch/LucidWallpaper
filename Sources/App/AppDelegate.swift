@@ -96,7 +96,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if ProcessInfo.processInfo.environment["LUCIDWALL_DUMP_MENU"] != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.statusBar.debugDumpMenu() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self else { return }
+                if let item = self.model.currentItem, let snd = SystemSounds.all.first?.url {
+                    self.model.setSound(snd, for: item)   // so the inline sound controls show in the dump
+                }
+                self.statusBar.debugDumpMenu()
+            }
         }
 
         if ProcessInfo.processInfo.environment["LUCIDWALL_FEEDBACK_TEST"] != nil, Feedback.endpoint != nil {
