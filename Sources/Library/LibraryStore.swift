@@ -150,8 +150,22 @@ final class LibraryStore {
     // MARK: Persistence
 
     private func load() {
-        guard let data = try? Data(contentsOf: AppPaths.libraryIndex),
-              let decoded = try? JSONDecoder().decode(Persisted.self, from: data) else { return }
+        // No file yet (first launch) is normal - just start empty.
+        guard let data = try? Data(contentsOf: AppPaths.libraryIndex) else { return }
+        let decoded: Persisted
+        do {
+            decoded = try JSONDecoder().decode(Persisted.self, from: data)
+        } catch {
+            // The file exists but won't decode (corruption, or a newer/older incompatible schema).
+            // Preserve it for recovery instead of silently starting empty - otherwise the next
+            // mutation's save() would overwrite the user's whole library, favorites, and profiles.
+            let backup = AppPaths.libraryIndex.deletingPathExtension()
+                .appendingPathExtension("corrupt-\(Int(Date().timeIntervalSince1970)).json")
+            try? FileManager.default.copyItem(at: AppPaths.libraryIndex, to: backup)
+            NSLog("[LibraryStore] library.json failed to decode (%@); backed up to %@",
+                  String(describing: error), backup.lastPathComponent)
+            return
+        }
         items = decoded.items
         currentItemID = decoded.currentItemID
         overrides = decoded.overrides ?? [:]

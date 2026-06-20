@@ -63,12 +63,16 @@ enum LivelyImporter {
         if let remote = remoteURL(from: entryName) {
             contentURL = remote
         } else {
-            let entryURL = dest.appendingPathComponent(entryName)
+            // The entry name comes from an untrusted manifest - reject path traversal that would
+            // resolve outside the imported package (zip-slip into arbitrary filesystem locations).
+            guard let entryURL = sanitizedChild(entryName, under: dest) else {
+                throw ImportError.missingEntryFile(entryName)
+            }
             guard fm.fileExists(atPath: entryURL.path) else { throw ImportError.missingEntryFile(entryName) }
             contentURL = entryURL
         }
 
-        let thumb = info.thumbnail.map { dest.appendingPathComponent($0) }
+        let thumb = info.thumbnail.flatMap { sanitizedChild($0, under: dest) }
         let props = dest.appendingPathComponent("LivelyProperties.json")
 
         return WallpaperItem(
@@ -95,6 +99,15 @@ enum LivelyImporter {
     private static func existing(_ url: URL?) -> URL? {
         guard let url, FileManager.default.fileExists(atPath: url.path) else { return nil }
         return url
+    }
+
+    /// Resolve a manifest-supplied relative path under `base`, returning nil if it escapes the
+    /// directory (absolute path, `..` traversal). Guards against zip-slip from untrusted packages.
+    private static func sanitizedChild(_ name: String, under base: URL) -> URL? {
+        let child = base.appendingPathComponent(name).standardizedFileURL
+        let root = base.standardizedFileURL.path
+        guard child.path == root || child.path.hasPrefix(root + "/") else { return nil }
+        return child
     }
 
     private static func extractZip(_ zip: URL, to dest: URL) throws {

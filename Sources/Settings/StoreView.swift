@@ -8,10 +8,6 @@ struct StoreView: View {
     @EnvironmentObject private var model: AppModel
     @State private var busy: UUID?
     @State private var error: String?
-    @State private var aiPrompt = ""
-    @State private var aiBusy = false
-    @State private var aiError: String?
-    @State private var apiKey = AIShaderService.apiKey
 
     var body: some View {
         Form {
@@ -23,35 +19,6 @@ struct StoreView: View {
                 }
                 .padding(.vertical, 2)
             }
-
-            Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Describe a wallpaper and AI writes a live Metal shader for it.")
-                        .font(.callout)
-                    TextField("e.g. slow aurora over a dark ocean", text: $aiPrompt)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit { generateAI() }
-                    HStack {
-                        if aiBusy {
-                            ProgressView().controlSize(.small)
-                            Text("Generating…").foregroundStyle(.secondary)
-                        } else {
-                            Button { generateAI() } label: { Label("Generate", systemImage: "wand.and.stars") }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(aiPrompt.trimmingCharacters(in: .whitespaces).isEmpty || keyEmpty)
-                        }
-                        Spacer()
-                    }
-                    SecureField("Anthropic API key (sk-ant-…)", text: $apiKey)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: apiKey) { _, v in AIShaderService.apiKey = v }
-                    Text(keyEmpty
-                         ? "Paste an Anthropic API key (console.anthropic.com) to enable AI generation. It’s stored locally and used only for these requests."
-                         : "Key saved locally. Generated shaders are validated before they’re applied.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    if let aiError { Text(aiError).font(.footnote).foregroundStyle(.red) }
-                }
-            } header: { Text("✨ Generate with AI") }
 
             Section("Community Gallery") {
                 ForEach(Gallery.curated) { item in
@@ -89,19 +56,6 @@ struct StoreView: View {
     }
 
     // MARK: Actions
-
-    private var keyEmpty: Bool { apiKey.trimmingCharacters(in: .whitespaces).isEmpty }
-
-    private func generateAI() {
-        let prompt = aiPrompt.trimmingCharacters(in: .whitespaces)
-        guard !prompt.isEmpty, !aiBusy else { return }
-        aiBusy = true; aiError = nil
-        Task {
-            do { try await model.generateAIShader(prompt: prompt); aiPrompt = "" }
-            catch { aiError = error.localizedDescription }
-            aiBusy = false
-        }
-    }
 
     private func download(_ item: GalleryItem) {
         busy = item.id; error = nil

@@ -84,7 +84,9 @@ final class SlideshowRenderer: NSObject, WallpaperRenderer {
         let outgoing = showingA ? layerA : layerB
         showingA.toggle()
         loadImage(url) { [weak self] cg in
-            guard let self, let cg else { return }
+            // The decode is async: if the wallpaper was paused/occluded meanwhile, don't start
+            // a crossfade on a frozen layer clock (it would resume inconsistently).
+            guard let self, let cg, !self.paused else { return }
             incoming.contents = cg
             incoming.opacity = 0
             self.kenBurns(incoming)

@@ -93,6 +93,26 @@ ok=0; wait_marker /tmp/p_compat.log "renderer=VideoRenderer" && ok=1
 killall LucidWallpaper 2>/dev/null
 check "v0.1 library loads + restores wallpaper" $([ "$ok" = 1 ] && echo 0 || echo 1)
 
+echo "=== Corruption safety (bad library.json must be backed up, never wiped) ==="
+rm -f "$SUPPORT"/library.corrupt-*.json 2>/dev/null
+printf '{ this is not valid json' > "$LIB"
+killall LucidWallpaper 2>/dev/null; sleep 0.3
+"$APP" >/tmp/p_corrupt.log 2>&1 &   # no autostart -> load() must not crash or wipe
+cpid=$!
+cok=0; wait_marker /tmp/p_corrupt.log "window screen=" && cok=1
+alive=no; kill -0 "$cpid" 2>/dev/null && alive=yes
+killall LucidWallpaper 2>/dev/null
+backup=$(ls "$SUPPORT"/library.corrupt-*.json 2>/dev/null | head -1)
+ccrash=$(grep -icE "fatal error|signal SIG|Crashed:|EXC_BAD" /tmp/p_corrupt.log)
+if [ "$cok" = 1 ] && [ "$alive" = yes ] && [ "$ccrash" = 0 ] && [ -n "$backup" ]; then
+  check "corrupt library backed up (not wiped), no crash" 0
+else
+  echo "  (came-up=$cok alive=$alive crash=$ccrash backup=${backup:-none})"
+  check "corrupt library backed up (not wiped), no crash" 1
+fi
+# Leave a clean slate: drop the deliberately-corrupt file + backups so a real launch re-seeds.
+rm -f "$LIB" "$SUPPORT"/library.corrupt-*.json 2>/dev/null
+
 echo
 echo "=== RESULT: $PASS passed, $FAIL failed ==="
 exit $FAIL

@@ -178,23 +178,6 @@ final class AppModel: ObservableObject {
         body()
     }
 
-    // MARK: AI shader generation
-
-    /// Generate a Metal shader wallpaper from a prompt, save it, and apply it.
-    func generateAIShader(prompt: String) async throws {
-        let shade = try await AIShaderService.generate(prompt: prompt)
-        let id = UUID()
-        let dir = AppPaths.library.appendingPathComponent(id.uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent("shader.metal")
-        try shade.write(to: url, atomically: true, encoding: .utf8)
-        let title = prompt.split(separator: " ").prefix(4).joined(separator: " ")
-        let item = WallpaperItem(id: id, title: title.isEmpty ? "AI Shader" : title,
-                                 kind: .shader, contentURL: url, author: "AI",
-                                 desc: "AI-generated · “\(prompt)”")
-        apply(item, addToLibrary: true)
-    }
-
     /// Assign a random library wallpaper to each display (Independent mode).
     func shufflePerDisplay() {
         let pool = library.items
@@ -283,9 +266,15 @@ final class AppModel: ObservableObject {
     }
 
     // Global dim (0 = off ... 0.9). Driven by the slider and the dim hotkey.
-    private var lastDim = 0.5
+    // Seed the "restore" level from the persisted value so toggling on after a relaunch
+    // returns to the user's chosen dim, not a hardcoded default.
+    private var lastDim: Double = { let d = UserDefaults.standard.double(forKey: "wallpaperDim"); return d > 0.001 ? d : 0.5 }()
     @Published var wallpaperDim = UserDefaults.standard.double(forKey: "wallpaperDim") {
-        didSet { UserDefaults.standard.set(wallpaperDim, forKey: "wallpaperDim"); windowManager.setBaseDim(CGFloat(wallpaperDim)) }
+        didSet {
+            UserDefaults.standard.set(wallpaperDim, forKey: "wallpaperDim")
+            if wallpaperDim > 0.001 { lastDim = wallpaperDim }   // remember any non-zero level (slider or restore)
+            windowManager.setBaseDim(CGFloat(wallpaperDim))
+        }
     }
     func toggleDim() {
         if wallpaperDim > 0.001 { lastDim = wallpaperDim; wallpaperDim = 0 }
@@ -301,9 +290,15 @@ final class AppModel: ObservableObject {
     let audio = AudioController()
     let perSpace = PerSpaceController()
     @Published var audioVolume = Float(UserDefaults.standard.double(forKey: "audioVolume")) {
-        didSet { UserDefaults.standard.set(Double(audioVolume), forKey: "audioVolume"); audio.volume = audioVolume; updateAudio() }
+        didSet {
+            UserDefaults.standard.set(Double(audioVolume), forKey: "audioVolume")
+            if audioVolume > 0.001 { lastAudioVolume = audioVolume }   // remember level for unmute (slider or hotkey)
+            audio.volume = audioVolume
+            updateAudio()
+        }
     }
-    private var lastAudioVolume: Float = 0.5
+    // Seed from the persisted level so unmuting after a relaunch returns to the user's level.
+    private var lastAudioVolume: Float = { let v = Float(UserDefaults.standard.double(forKey: "audioVolume")); return v > 0.001 ? v : 0.5 }()
     var audioMuted: Bool { audioVolume <= 0.001 }
     /// Mute / unmute the single ambient sound (remembers the prior level).
     func toggleMute() {
@@ -417,6 +412,9 @@ final class AppModel: ObservableObject {
         cloud.enabled = iCloudSyncEnabled
         if autoCheckUpdates { UpdateChecker.check(manual: false) }
         refresh()
+        // Establish the audio gate deterministically from the resolved pause state, regardless of
+        // the order earlier watchers fired in (otherwise a sound can play while already paused).
+        reconcileAudio()
     }
 
     func stop() {
@@ -431,6 +429,7 @@ final class AppModel: ObservableObject {
         meeting.stop()
         idle.stop()
         audio.stop()
+        audioUserPaused = false   // don't carry a paused-sound state across a stop/start cycle
         perSpace.stop()
         cloud.enabled = false   // remove the iCloud KVS observer (deactivate)
         mouseMonitor.stop()

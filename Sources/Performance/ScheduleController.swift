@@ -34,9 +34,13 @@ final class ScheduleController {
             }
             applyForAppearance()
         case .time:
-            timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            // Add in .common mode so the day/night check keeps firing while a menu/modal tracking
+            // loop is active (Timer.scheduledTimer uses .default only, and would stall).
+            let t = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
                 Task { @MainActor in self?.applyForTime() }
             }
+            RunLoop.main.add(t, forMode: .common)
+            timer = t
             applyForTime()
         }
     }
