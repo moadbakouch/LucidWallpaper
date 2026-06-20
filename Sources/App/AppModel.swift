@@ -96,6 +96,30 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(monitorMode.rawValue, forKey: "monitorMode"); windowManager.setMonitorMode(monitorMode) }
     }
 
+    /// What a freshly-connected (unassigned, Independent-mode) display shows.
+    @Published var newDisplayBehavior: NewDisplayBehavior =
+        NewDisplayBehavior(rawValue: UserDefaults.standard.string(forKey: "newDisplayBehavior") ?? "") ?? .mirror {
+        didSet {
+            UserDefaults.standard.set(newDisplayBehavior.rawValue, forKey: "newDisplayBehavior")
+            windowManager.setNewDisplayBehavior(newDisplayBehavior)
+        }
+    }
+
+    // MARK: Per-display fit / pause
+
+    func displayScaling(forDisplay id: CGDirectDisplayID) -> VideoScaling? { windowManager.displayScaling(forDisplay: id) }
+    func setDisplayScaling(_ scaling: VideoScaling?, forDisplay id: CGDirectDisplayID) {
+        windowManager.setDisplayScaling(scaling, forDisplay: id)
+        library.setDisplayScaling(scaling, forDisplayString: String(id))
+        objectWillChange.send()
+    }
+    func isDisplayPaused(_ id: CGDirectDisplayID) -> Bool { windowManager.isDisplayPaused(id) }
+    func setDisplayPaused(_ paused: Bool, forDisplay id: CGDirectDisplayID) {
+        windowManager.setDisplayPaused(paused, forDisplay: id)
+        library.setDisplayPaused(paused, forDisplayString: String(id))
+        objectWillChange.send()
+    }
+
     /// The id of the wallpaper assigned to a display in Independent mode (nil = default).
     func displayWallpaperID(_ displayID: CGDirectDisplayID) -> UUID? {
         windowManager.displayAssignment(forDisplay: displayID)?.id
@@ -322,6 +346,13 @@ final class AppModel: ObservableObject {
     func start() {
         seedBuiltInsIfNeeded()
         windowManager.monitorMode = monitorMode
+        windowManager.newDisplayBehavior = newDisplayBehavior
+        // Restore persisted per-display fit/pause before the first rebuild uses them.
+        let scalings = library.displayScalingMap().reduce(into: [CGDirectDisplayID: VideoScaling]()) { acc, kv in
+            if let id = CGDirectDisplayID(kv.key) { acc[id] = kv.value }
+        }
+        let paused = Set(library.pausedDisplayStrings().compactMap { CGDirectDisplayID($0) })
+        windowManager.restoreDisplayOverrides(scalings: scalings, paused: paused)
         windowManager.setBaseFrameRateCap(wallpaperFrameRate)
         windowManager.start()
         playback.pauseOnBattery = pauseOnBattery

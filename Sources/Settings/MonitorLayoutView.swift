@@ -23,7 +23,7 @@ struct MonitorLayoutView: View {
 
             Text(modeHint).font(.footnote).foregroundStyle(.secondary)
 
-            MonitorMapCanvas(screens: screens, selected: $selected, interactive: independent)
+            MonitorMapCanvas(screens: screens, selected: $selected, interactive: true)
                 .frame(height: 168)
                 .frame(maxWidth: .infinity)
                 .id(screenChange)
@@ -38,12 +38,19 @@ struct MonitorLayoutView: View {
             .controlSize(.small)
 
             if independent {
-                if let sel = selected, let screen = screens.first(where: { $0.displayID == sel }) {
-                    assignmentStrip(for: screen)
-                } else {
-                    Text("Click a display above to choose its wallpaper.")
-                        .font(.caption).foregroundStyle(.secondary)
+                Picker("When a display connects", selection: $model.newDisplayBehavior) {
+                    ForEach(NewDisplayBehavior.allCases) { Text($0.label).tag($0) }
                 }
+            }
+
+            if let sel = selected, let screen = screens.first(where: { $0.displayID == sel }) {
+                Divider()
+                if independent { assignmentStrip(for: screen) }
+                perDisplaySettings(for: screen)
+            } else {
+                Text(independent ? "Click a display to choose its wallpaper and per-display settings."
+                                 : "Click a display to adjust its per-display settings.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
@@ -82,6 +89,51 @@ struct MonitorLayoutView: View {
                 .padding(.vertical, 2)
             }
         }
+    }
+
+    /// Per-display fit/zoom + pause for the selected screen (works in any mode).
+    @ViewBuilder private func perDisplaySettings(for screen: NSScreen) -> some View {
+        let id = screen.displayID
+        Toggle("Pause this display", isOn: Binding(
+            get: { model.isDisplayPaused(id) },
+            set: { model.setDisplayPaused($0, forDisplay: id) }))
+
+        if let item = displayItem(screen), isScalable(item) {
+            HStack {
+                Text("Fit").font(.caption).foregroundStyle(.secondary)
+                Picker("", selection: Binding(
+                    get: { effectiveScaling(id, item).mode },
+                    set: { var s = effectiveScaling(id, item); s.mode = $0; model.setDisplayScaling(s, forDisplay: id) })) {
+                    ForEach(VideoScaling.Mode.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden()
+            }
+            HStack(spacing: 8) {
+                Text("Zoom").font(.caption).foregroundStyle(.secondary)
+                Slider(value: Binding(
+                    get: { effectiveScaling(id, item).zoom },
+                    set: { var s = effectiveScaling(id, item); s.zoom = $0; model.setDisplayScaling(s, forDisplay: id) }),
+                    in: 1...2)
+                if model.displayScaling(forDisplay: id) != nil {
+                    Button("Reset") { model.setDisplayScaling(nil, forDisplay: id) }.controlSize(.small)
+                }
+            }
+        }
+    }
+
+    private func displayItem(_ screen: NSScreen) -> WallpaperItem? {
+        if model.monitorMode == .independent, let id = model.displayWallpaperID(screen.displayID) {
+            return model.items.first { $0.id == id }
+        }
+        return model.currentItem
+    }
+
+    private func isScalable(_ item: WallpaperItem) -> Bool {
+        [.video, .image, .gif, .slideshow].contains(item.kind)
+    }
+
+    private func effectiveScaling(_ id: CGDirectDisplayID, _ item: WallpaperItem) -> VideoScaling {
+        model.displayScaling(forDisplay: id) ?? model.videoScaling(for: item)
     }
 }
 
@@ -173,6 +225,13 @@ private struct MonitorTile: View {
                 .background(.black.opacity(0.45))
             }
             .padding(3)
+
+            if model.isDisplayPaused(screen.displayID) {
+                ZStack {
+                    Color.black.opacity(0.35)
+                    Image(systemName: "pause.circle.fill").font(.title2).foregroundStyle(.white.opacity(0.9))
+                }
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6)

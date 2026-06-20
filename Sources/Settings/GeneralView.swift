@@ -55,11 +55,11 @@ struct GeneralView: View {
     @ViewBuilder private var categoryContent: some View {
         switch category ?? .general {
         case .general:
-            currentSection; shortcutsSection; startupSection; aboutSection
+            currentSection; profilesSection; shortcutsSection; startupSection; aboutSection
         case .playback:
             playlistSection; scheduleSection
         case .displays:
-            displaysSection; profilesSection
+            displaysSection
         case .energy:
             energySection; activitySection; appRulesSection
         case .effects:

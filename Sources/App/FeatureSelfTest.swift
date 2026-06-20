@@ -31,6 +31,7 @@ final class FeatureSelfTest {
         testCommandPalette()
         testPerSpace()
         testWatchers()
+        testPerDisplay()
         testAudio()
         // Async chains: audio settle -> playlist -> shader -> summary.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.checkAudioThenPlaylist() }
@@ -89,6 +90,23 @@ final class FeatureSelfTest {
         model.reduceMotion.enabled = true
         model.reduceMotion.enabled = model.respectReduceMotion
         record("reduce-motion", true, "systemReduceMotion=\(sysReduce)")
+    }
+
+    private func testPerDisplay() {
+        guard let id = NSScreen.screens.first?.displayID, id != 0 else {
+            record("per-display", false, "no display"); return
+        }
+        model.setDisplayPaused(true, forDisplay: id)
+        let paused = model.isDisplayPaused(id) && model.windowManager.debugIsDisplayPlaying(id) == false
+        model.setDisplayPaused(false, forDisplay: id)
+        let resumed = !model.isDisplayPaused(id) && model.windowManager.debugIsDisplayPlaying(id) == true
+        model.setDisplayScaling(VideoScaling(mode: .fit, zoom: 1.5), forDisplay: id)
+        let s = model.displayScaling(forDisplay: id)
+        let fitOK = s?.mode == .fit && s?.zoom == 1.5
+        model.setDisplayScaling(nil, forDisplay: id)
+        let cleared = model.displayScaling(forDisplay: id) == nil
+        record("per-display", paused && resumed && fitOK && cleared,
+               "pause=\(paused) resume=\(resumed) fit=\(fitOK) clear=\(cleared)")
     }
 
     private func testAudio() {

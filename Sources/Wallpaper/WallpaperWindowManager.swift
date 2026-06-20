@@ -28,6 +28,14 @@ enum MonitorMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// What an unassigned display shows in Independent mode (i.e. a freshly connected monitor).
+enum NewDisplayBehavior: String, CaseIterable, Identifiable {
+    case mirror   // show the main wallpaper until you assign one
+    case blank    // leave it black until you assign one
+    var id: String { rawValue }
+    var label: String { self == .mirror ? "Mirror main wallpaper" : "Leave blank" }
+}
+
 /// A fully-resolved wallpaper assignment (content + its properties + scaling).
 struct WallpaperAssignment {
     var item: WallpaperItem
@@ -87,6 +95,10 @@ final class WallpaperWindowManager {
 
     /// Debug: dim overlay alpha on the first window (-1 if none); used by the feature test.
     var debugFirstDimAlpha: CGFloat { entries.first?.window.dimView.alphaValue ?? -1 }
+    /// Debug: whether a given display's renderer is currently playing (nil if no such window).
+    func debugIsDisplayPlaying(_ id: CGDirectDisplayID) -> Bool? {
+        entries.first(where: { $0.screen?.displayID == id })?.isPlaying
+    }
     /// Global pause reasons (user / system / battery). Occlusion is per-display, not here.
     private var pauseReasons: Set<PauseReason> = []
     private var globalPaused: Bool { !pauseReasons.isEmpty }
@@ -94,6 +106,42 @@ final class WallpaperWindowManager {
     /// Multi-monitor configuration.
     var monitorMode: MonitorMode = .mirror
     private var perDisplay: [CGDirectDisplayID: WallpaperAssignment] = [:]
+    /// Per-display overrides (survive rebuilds): a fit/zoom override and a manual pause, plus
+    /// what an unassigned display shows.
+    private var displayScalingOverrides: [CGDirectDisplayID: VideoScaling] = [:]
+    private var pausedDisplays: Set<CGDirectDisplayID> = []
+    var newDisplayBehavior: NewDisplayBehavior = .mirror
+
+    // MARK: Per-display fit / pause / new-display behaviour
+
+    func displayScaling(forDisplay id: CGDirectDisplayID) -> VideoScaling? { displayScalingOverrides[id] }
+
+    func setDisplayScaling(_ scaling: VideoScaling?, forDisplay id: CGDirectDisplayID) {
+        displayScalingOverrides[id] = scaling
+        if let entry = entries.first(where: { $0.screen?.displayID == id }) {
+            let effective = scaling ?? perDisplay[id]?.videoScaling ?? currentVideoScaling
+            entry.renderer?.applyVideoScaling(effective)
+        }
+    }
+
+    func isDisplayPaused(_ id: CGDirectDisplayID) -> Bool { pausedDisplays.contains(id) }
+
+    func setDisplayPaused(_ paused: Bool, forDisplay id: CGDirectDisplayID) {
+        if paused { pausedDisplays.insert(id) } else { pausedDisplays.remove(id) }
+        updatePlayback()
+    }
+
+    func setNewDisplayBehavior(_ behavior: NewDisplayBehavior) {
+        guard behavior != newDisplayBehavior else { return }
+        newDisplayBehavior = behavior
+        rebuild()   // unassigned displays change between the main wallpaper and blank
+    }
+
+    /// Restore persisted per-display overrides (display IDs are strings off disk).
+    func restoreDisplayOverrides(scalings: [CGDirectDisplayID: VideoScaling], paused: Set<CGDirectDisplayID>) {
+        displayScalingOverrides = scalings
+        pausedDisplays = paused
+    }
     /// Snapshot of the screen layout; used to ignore spurious screen-parameter notifications
     /// (creating our own windows can post one, which would otherwise loop into a rebuild).
     private var screenSignature = ""
@@ -351,7 +399,8 @@ final class WallpaperWindowManager {
     /// call on every occlusion notification.
     private func updatePlayback() {
         for entry in entries {
-            let shouldPlay = !globalPaused && !entry.occluded
+            let displayPaused = entry.screen.map { pausedDisplays.contains($0.displayID) } ?? false
+            let shouldPlay = !globalPaused && !entry.occluded && !displayPaused
             guard shouldPlay != entry.isPlaying else { continue }
             entry.isPlaying = shouldPlay
             shouldPlay ? entry.renderer?.play() : entry.renderer?.pause()
@@ -445,8 +494,19 @@ final class WallpaperWindowManager {
     }
 
     private func assignment(for screen: NSScreen) -> WallpaperAssignment? {
-        if monitorMode == .independent { return perDisplay[screen.displayID] ?? primaryAssignment }
-        return primaryAssignment
+        var base: WallpaperAssignment?
+        if monitorMode == .independent {
+            if let assigned = perDisplay[screen.displayID] { base = assigned }
+            else { base = (newDisplayBehavior == .blank) ? nil : primaryAssignment }
+        } else {
+            base = primaryAssignment
+        }
+        // A per-display fit/zoom override wins over the wallpaper's own scaling (any mode).
+        if var assignment = base, let override = displayScalingOverrides[screen.displayID] {
+            assignment.videoScaling = override
+            return assignment
+        }
+        return base
     }
 
     private func makeEntries() -> [ScreenWallpaper] {

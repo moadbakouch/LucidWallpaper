@@ -20,6 +20,20 @@ final class LibraryStore {
     private var soundPaths: [String: String] = [:]
     /// Ordered rotation playlist (empty = rotate the whole library).
     private(set) var playlist: [PlaylistEntry] = []
+    /// Per-display fit/zoom overrides and manual pauses, keyed by CGDirectDisplayID string.
+    private var displayScalings: [String: VideoScaling] = [:]
+    private var pausedDisplayIDs: Set<String> = []
+
+    func displayScalingMap() -> [String: VideoScaling] { displayScalings }
+    func setDisplayScaling(_ scaling: VideoScaling?, forDisplayString id: String) {
+        displayScalings[id] = scaling
+        save()
+    }
+    func pausedDisplayStrings() -> Set<String> { pausedDisplayIDs }
+    func setDisplayPaused(_ paused: Bool, forDisplayString id: String) {
+        if paused { pausedDisplayIDs.insert(id) } else { pausedDisplayIDs.remove(id) }
+        save()
+    }
 
     func addToPlaylist(_ itemID: UUID) { playlist.append(PlaylistEntry(itemID: itemID)); save() }
     func removeFromPlaylist(_ id: UUID) { playlist.removeAll { $0.id == id }; save() }
@@ -38,6 +52,8 @@ final class LibraryStore {
         var profiles: [WallpaperProfile]?
         var soundPaths: [String: String]?
         var playlist: [PlaylistEntry]?
+        var displayScalings: [String: VideoScaling]?
+        var pausedDisplays: [String]?
     }
 
     func soundURL(for id: UUID) -> URL? {
@@ -145,6 +161,8 @@ final class LibraryStore {
         profiles = decoded.profiles ?? []
         soundPaths = decoded.soundPaths ?? [:]
         playlist = decoded.playlist ?? []
+        displayScalings = decoded.displayScalings ?? [:]
+        pausedDisplayIDs = Set(decoded.pausedDisplays ?? [])
     }
 
     private func save() {
@@ -156,7 +174,9 @@ final class LibraryStore {
                                 tags: tags,
                                 profiles: profiles,
                                 soundPaths: soundPaths,
-                                playlist: playlist)
+                                playlist: playlist,
+                                displayScalings: displayScalings,
+                                pausedDisplays: Array(pausedDisplayIDs))
         guard let data = try? JSONEncoder().encode(payload) else { return }
         try? data.write(to: AppPaths.libraryIndex, options: .atomic)
     }
