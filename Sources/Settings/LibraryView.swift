@@ -360,35 +360,30 @@ struct WallpaperDetail: View {
 
     private var isApplied: Bool { model.currentItemID == item.id }
 
-    /// Apply button. With multiple displays it becomes a menu: all displays, or just one.
+    /// Apply split-button: the main action applies to all displays; the arrow picks a single
+    /// display (so you can send a wallpaper to one monitor fast).
     @ViewBuilder private var applyControl: some View {
         let screens = NSScreen.screens
-        if screens.count > 1 {
-            Menu {
+        Menu {
+            if screens.count > 1 {
                 Button("All Displays") { model.applyToAllDisplays(item) }
                 Divider()
-                ForEach(Array(screens.enumerated()), id: \.offset) { index, screen in
-                    Button(screenLabel(screen, index)) {
-                        model.applyToDisplay(item, displayID: screen.displayID)
-                    }
+            }
+            ForEach(Array(screens.enumerated()), id: \.offset) { index, screen in
+                Button {
+                    model.applyToDisplay(item, displayID: screen.displayID)
+                } label: {
+                    Label(screenLabel(screen, index), systemImage: "display")
                 }
-            } label: {
-                Label(isApplied ? "Applied" : "Apply", systemImage: isApplied ? "checkmark" : "play.fill")
-            } primaryAction: {
-                model.applyToAllDisplays(item)
             }
-            .menuStyle(.borderlessButton)
-            .buttonStyle(.borderedProminent)
-            .fixedSize()
-        } else {
-            Button {
-                model.apply(item, addToLibrary: false)
-            } label: {
-                Label(isApplied ? "Applied" : "Apply", systemImage: isApplied ? "checkmark" : "play.fill")
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isApplied)
+        } label: {
+            Label(isApplied ? "Applied" : "Apply", systemImage: isApplied ? "checkmark" : "play.fill")
+        } primaryAction: {
+            screens.count > 1 ? model.applyToAllDisplays(item) : model.apply(item, addToLibrary: false)
         }
+        .menuStyle(.button)
+        .buttonStyle(.borderedProminent)
+        .fixedSize()
     }
 
     private func screenLabel(_ screen: NSScreen, _ index: Int) -> String {
@@ -425,32 +420,61 @@ struct PaletteView: View {
     }
 }
 
-/// Assign an optional looping ambient sound to a wallpaper.
+/// Assign an optional looping ambient sound to a wallpaper - a macOS built-in "Background
+/// Sound" (Rain, Ocean, …) as the quick option, or a custom audio file as the secondary one.
 struct SoundPicker: View {
     @EnvironmentObject private var model: AppModel
     let item: WallpaperItem
 
+    private var current: URL? { model.soundURL(for: item) }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Ambient Sound").font(.headline)
-            if let url = model.soundURL(for: item) {
+
+            if let url = current {
                 HStack(spacing: 6) {
-                    Image(systemName: "music.note").foregroundStyle(.tint)
-                    Text(url.lastPathComponent).font(.caption).lineLimit(1)
+                    Image(systemName: "speaker.wave.2.fill").foregroundStyle(.tint)
+                    Text(SystemSounds.displayName(for: url) ?? url.lastPathComponent).font(.callout).lineLimit(1)
                     Spacer()
                     Button { model.setSound(nil, for: item) } label: { Image(systemName: "xmark.circle.fill") }
-                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .buttonStyle(.plain).foregroundStyle(.secondary).help("Remove sound")
                 }
-            } else {
-                Button { pick() } label: { Label("Add sound…", systemImage: "music.note") }
             }
-            Text("Loops while this wallpaper is active. Set the master volume in Settings → Live Effects.")
+
+            if !SystemSounds.all.isEmpty {
+                Text("macOS Sounds").font(.caption).foregroundStyle(.secondary)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 6)], alignment: .leading, spacing: 6) {
+                    ForEach(SystemSounds.all) { sound in
+                        soundChip(sound)
+                    }
+                }
+            }
+
+            Button { pickCustom() } label: { Label("Custom Sound…", systemImage: "folder") }
+                .controlSize(.small)
+
+            Text("Plays a looping ambient sound while this wallpaper is active. The macOS sounds come "
+                 + "from your system. Adjust or mute the overall level in Settings → Live Effects.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .id(item.id)
     }
 
-    private func pick() {
+    private func soundChip(_ sound: SystemSounds.Sound) -> some View {
+        let selected = current?.path == sound.url.path
+        return Button { model.setSound(sound.url, for: item) } label: {
+            Text(sound.displayName)
+                .font(.caption2).lineLimit(1).minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity).padding(.vertical, 5).padding(.horizontal, 4)
+                .background(RoundedRectangle(cornerRadius: 6)
+                    .fill(selected ? Color.accentColor : Color.primary.opacity(0.08)))
+                .foregroundStyle(selected ? .white : .primary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func pickCustom() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.audio]
         panel.allowsMultipleSelection = false

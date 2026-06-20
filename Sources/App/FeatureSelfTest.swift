@@ -92,17 +92,20 @@ final class FeatureSelfTest {
     }
 
     private func testAudio() {
-        let ping = URL(fileURLWithPath: "/System/Library/Sounds/Ping.aiff")
-        guard FileManager.default.fileExists(atPath: ping.path), let item = model.currentItem else {
+        // Use a macOS built-in Background Sound (Rain/Ocean/…) to also exercise SystemSounds.
+        let url = SystemSounds.all.first?.url ?? URL(fileURLWithPath: "/System/Library/Sounds/Ping.aiff")
+        guard FileManager.default.fileExists(atPath: url.path), let item = model.currentItem else {
             record("audio", false, "no current item / sound file"); return
         }
-        model.setSound(ping, for: item)
-        model.audioVolume = 0.6
+        model.audioVolume = 0          // start muted - assigning a sound should un-mute it
+        model.setSound(url, for: item)
     }
 
     private func checkAudioThenPlaylist() {
         let playing = model.audio.debugIsPlaying
-        record("audio", playing, "isPlaying=\(playing)")
+        let unmuted = model.audioVolume > 0
+        record("audio", playing && unmuted,
+               "isPlaying=\(playing) vol=\(String(format: "%.1f", model.audioVolume)) sound=\(SystemSounds.all.first?.displayName ?? "ping") n=\(SystemSounds.all.count)")
         // Audio must follow the global pause (not only user pause): pause -> silent, resume -> plays.
         model.setUserPaused(true)
         let silenced = !model.audio.debugIsPlaying

@@ -285,6 +285,9 @@ final class AppModel: ObservableObject {
 
     func setSound(_ url: URL?, for item: WallpaperItem) {
         library.setSound(url, for: item.id)
+        // Un-mute so the chosen sound is actually audible (master defaults to 0). Only bumps
+        // from silent - never overrides a level the user set.
+        if url != nil, audioVolume <= 0.001 { audioVolume = 0.5 }
         if library.currentItemID == item.id { updateAudio() }
         objectWillChange.send()
     }
