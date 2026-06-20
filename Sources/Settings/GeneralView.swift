@@ -209,21 +209,7 @@ struct GeneralView: View {
 
     private var displaysSection: some View {
         Section("Displays") {
-            Picker("Multi-monitor", selection: $model.monitorMode) {
-                ForEach(MonitorMode.allCases) { Text($0.label).tag($0) }
-            }
-            switch model.monitorMode {
-            case .mirror: Text("The same wallpaper plays on every display.").font(.footnote).foregroundStyle(.secondary)
-            case .span: Text("One canvas is stretched across all displays.").font(.footnote).foregroundStyle(.secondary)
-            case .independent:
-                Text("Assign a wallpaper to each display:").font(.footnote).foregroundStyle(.secondary)
-                ForEach(Array(NSScreen.screens.enumerated()), id: \.offset) { index, screen in
-                    PerDisplayPicker(label: "Display \(index + 1)", displayID: screen.displayID)
-                }
-                if NSScreen.screens.count > 1 {
-                    Button { model.shufflePerDisplay() } label: { Label("Shuffle each display", systemImage: "shuffle") }
-                }
-            }
+            MonitorLayoutView()
             if PerSpaceController.isSupported {
                 Toggle("Different wallpaper per Space", isOn: $model.perSpaceEnabled)
                 Text("Remembers a wallpaper for each Mission Control Space and restores it as you switch.")
@@ -442,24 +428,3 @@ struct WallpaperPicker: View {
     }
 }
 
-/// Per-display wallpaper assignment (Independent mode).
-struct PerDisplayPicker: View {
-    @EnvironmentObject private var model: AppModel
-    let label: String
-    let displayID: CGDirectDisplayID
-    @State private var selection: UUID?
-
-    var body: some View {
-        Picker(label, selection: $selection) {
-            Text("Default").tag(UUID?.none)
-            ForEach(model.items) { item in
-                Text(item.title).tag(UUID?.some(item.id))
-            }
-        }
-        .onAppear { selection = model.displayWallpaperID(displayID) }
-        .onChange(of: selection) { _, newValue in
-            let item = newValue.flatMap { id in model.items.first { $0.id == id } }
-            model.setDisplayWallpaper(item, displayID: displayID)
-        }
-    }
-}

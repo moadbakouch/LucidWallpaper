@@ -91,6 +91,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.model.requestFeedback?() }
         }
 
+        if ProcessInfo.processInfo.environment["LUCIDWALL_IDENTIFY"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { IdentifyOverlay.flash() }
+        }
+
         if ProcessInfo.processInfo.environment["LUCIDWALL_FEEDBACK_TEST"] != nil, Feedback.endpoint != nil {
             Task { @MainActor in
                 let report = Feedback.makeReport(category: "Bug", message: "Automated test report from the harness.",
