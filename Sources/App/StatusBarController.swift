@@ -51,17 +51,18 @@ final class StatusBarController: NSObject {
         menu.addItem(switchSubmenu())
 
         menu.addItem(.separator())
-        // Ambient-sound controls, inline (only when the current wallpaper has a sound). There's
-        // one ambient sound at a time, so this slider/mute always controls that single sound.
-        if let item = model.currentItem, let url = model.soundURL(for: item) {
-            let name = SystemSounds.displayName(for: url) ?? url.lastPathComponent
-            let label = NSMenuItem(title: "Sound: \(name)", action: nil, keyEquivalent: "")
-            label.isEnabled = false
-            menu.addItem(label)
-            menu.addItem(volumeItem())
+        // Ambient-sound controls, always inline (one ambient sound at a time - this slider/mute
+        // controls that single sound; the level persists even before a sound is chosen).
+        let soundURL = model.currentItem.flatMap { model.soundURL(for: $0) }
+        let soundTitle = soundURL.map { "Sound: \(SystemSounds.displayName(for: $0) ?? $0.lastPathComponent)" } ?? "Ambient Sound"
+        let soundLabel = NSMenuItem(title: soundTitle, action: nil, keyEquivalent: "")
+        soundLabel.isEnabled = false
+        menu.addItem(soundLabel)
+        menu.addItem(volumeItem())
+        if soundURL != nil {
             addItem(to: menu, title: "Remove Sound", action: #selector(removeSound))
-            menu.addItem(.separator())
         }
+        menu.addItem(.separator())
         menu.addItem(addSubmenu())
 
         menu.addItem(.separator())
