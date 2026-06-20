@@ -93,6 +93,16 @@ final class OverlayController {
 
     private func hide() { window?.orderOut(nil); window = nil }
     private func reposition() { if settings.enabled { window?.setFrame(NSScreen.main?.frame ?? .zero, display: true) } }
+
+    /// Rebuild the hosting view (e.g. after the Liquid Glass theme toggles) if currently shown.
+    func refresh() {
+        guard settings.enabled, let window, let content = window.contentView else { return }
+        content.subviews.forEach { $0.removeFromSuperview() }
+        let host = NSHostingView(rootView: WidgetsView().environmentObject(settings))
+        host.frame = content.bounds
+        host.autoresizingMask = [.width, .height]
+        content.addSubview(host)
+    }
 }
 
 /// The widgets themselves: clock, date, now-playing and weather, placed in a chosen corner.
@@ -129,6 +139,7 @@ struct WidgetsView: View {
             }
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.55), radius: 6, y: 1)
+            .widgetGlass()   // Liquid Glass card on macOS 26+ (refracts the wallpaper); no-op otherwise
             .padding(40)
         }
         .task { await loadWeather() }

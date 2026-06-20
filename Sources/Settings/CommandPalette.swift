@@ -88,8 +88,7 @@ struct CommandPaletteView: View {
             }
         }
         .frame(width: 560, height: 420)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .panelGlass(cornerRadius: 12)   // Liquid Glass on macOS 26+, .regularMaterial fallback
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.1)))
         .onAppear { focused = true; selected = 0 }
         .onChange(of: query) { _, _ in selected = 0 }

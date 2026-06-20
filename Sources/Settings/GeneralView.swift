@@ -55,7 +55,7 @@ struct GeneralView: View {
     @ViewBuilder private var categoryContent: some View {
         switch category ?? .general {
         case .general:
-            currentSection; profilesSection; shortcutsSection; startupSection; aboutSection
+            currentSection; appearanceSection; profilesSection; shortcutsSection; startupSection; aboutSection
         case .playback:
             playlistSection; scheduleSection
         case .displays:
@@ -145,6 +145,24 @@ struct GeneralView: View {
                     Button { model.cycleWallpaper(by: 1) } label: { Label("Next", systemImage: "forward.fill") }
                     Button { model.randomWallpaper() } label: { Label("Random", systemImage: "shuffle") }
                 }
+            }
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section("Appearance") {
+            if model.liquidGlassSupported {
+                Toggle("Liquid Glass", isOn: $model.liquidGlassEnabled)
+                Text("Use macOS 26’s translucent Liquid Glass material for the desktop widgets, the command palette, and setup panels.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            } else {
+                HStack {
+                    Text("Liquid Glass")
+                    Spacer()
+                    Text("Requires macOS 26").foregroundStyle(.secondary)
+                }
+                Text("This Mac uses the standard translucent material. Update to macOS 26 (Tahoe) for the Liquid Glass theme.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
         }
     }

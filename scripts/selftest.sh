@@ -10,6 +10,19 @@ SUPPORT="$HOME/Library/Application Support/LucidWallpaper"
 LIB="$SUPPORT/library.json"
 PASS=0; FAIL=0
 
+# This test is DESTRUCTIVE (it wipes SUPPORT + the prefs domain). Back up the user's real
+# library + preferences and restore them on exit, so running the test never loses real data.
+_BK="$(mktemp -d)/support"; _DEFBK="$(mktemp).plist"
+[ -d "$SUPPORT" ] && cp -R "$SUPPORT" "$_BK" 2>/dev/null || true
+defaults export com.lucidwallpaper.app "$_DEFBK" 2>/dev/null || true
+_restore() {
+  killall LucidWallpaper 2>/dev/null || true
+  rm -rf "$SUPPORT"
+  [ -d "$_BK" ] && cp -R "$_BK" "$SUPPORT" 2>/dev/null || true
+  [ -f "$_DEFBK" ] && defaults import com.lucidwallpaper.app "$_DEFBK" 2>/dev/null || true
+}
+trap _restore EXIT
+
 # Ensure test assets exist.
 [ -f /tmp/portrait.mp4 ] || swift scripts/make-test-video.swift /tmp/portrait.mp4 480 854 >/dev/null
 [ -d /tmp/test-lively ] || { echo "missing /tmp/test-lively"; exit 1; }

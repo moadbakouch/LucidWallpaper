@@ -32,6 +32,7 @@ final class FeatureSelfTest {
         testPerSpace()
         testWatchers()
         testPerDisplay()
+        testLiquidGlass()
         testAudio()
         // Async chains: audio settle -> playlist -> shader -> summary.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.checkAudioThenPlaylist() }
@@ -107,6 +108,22 @@ final class FeatureSelfTest {
         let cleared = model.displayScaling(forDisplay: id) == nil
         record("per-display", paused && resumed && fitOK && cleared,
                "pause=\(paused) resume=\(resumed) fit=\(fitOK) clear=\(cleared)")
+    }
+
+    private func testLiquidGlass() {
+        // The OS-gating contract: on macOS 26+ the toggle persists; on older OSes it stays off.
+        let supported = LiquidGlass.isSupported
+        if supported {
+            model.liquidGlassEnabled = true
+            let onOK = LiquidGlass.isEnabled == true
+            model.liquidGlassEnabled = false
+            let offOK = LiquidGlass.isEnabled == false
+            model.liquidGlassEnabled = true   // restore default-on
+            record("liquid-glass", onOK && offOK, "supported on=\(onOK) off=\(offOK)")
+        } else {
+            model.liquidGlassEnabled = true   // must be ignored
+            record("liquid-glass", LiquidGlass.isEnabled == false, "unsupported -> stays off")
+        }
     }
 
     private func testAudio() {

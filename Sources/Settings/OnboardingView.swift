@@ -90,7 +90,7 @@ struct OnboardingView: View {
                 }
                 Spacer()
                 Button(saverInstalled ? "Reinstall" : "Install") { installSaver() }
-                    .buttonStyle(.borderedProminent)
+                    .glassProminentButton()
             }
             if let installNote { Text(installNote).font(.caption).foregroundStyle(.secondary) }
 
@@ -156,10 +156,10 @@ struct OnboardingView: View {
                 Spacer()
                 if page < pageCount - 1 {
                     Button("Continue") { withAnimation { page += 1 } }
-                        .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                        .glassProminentButton().keyboardShortcut(.defaultAction)
                 } else {
                     Button("Get Started") { onFinish() }
-                        .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                        .glassProminentButton().keyboardShortcut(.defaultAction)
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 14)

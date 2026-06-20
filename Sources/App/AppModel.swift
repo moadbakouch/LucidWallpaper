@@ -16,6 +16,13 @@ final class AppModel: ObservableObject {
     let overlay = OverlayController()
     var overlaySettings: OverlaySettings { overlay.settings }
 
+    /// Liquid Glass theme (macOS 26+). Toggling it re-skins the live desktop widgets immediately;
+    /// the command palette / onboarding pick it up the next time they open.
+    @Published var liquidGlassEnabled = LiquidGlass.isEnabled {
+        didSet { LiquidGlass.isEnabled = liquidGlassEnabled; overlay.refresh() }
+    }
+    var liquidGlassSupported: Bool { LiquidGlass.isSupported }
+
     @Published private(set) var items: [WallpaperItem] = []
     @Published private(set) var currentItemID: UUID?
     @Published private(set) var isUserPaused = false
