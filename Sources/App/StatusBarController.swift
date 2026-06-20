@@ -58,7 +58,9 @@ final class StatusBarController: NSObject {
         let soundLabel = NSMenuItem(title: soundTitle, action: nil, keyEquivalent: "")
         soundLabel.isEnabled = false
         menu.addItem(soundLabel)
+        soundLabelItem = soundLabel
         menu.addItem(volumeItem())
+        menu.addItem(transportItem())
         if soundURL != nil {
             addItem(to: menu, title: "Remove Sound", action: #selector(removeSound))
         }
@@ -116,7 +118,28 @@ final class StatusBarController: NSObject {
 
     private weak var volumeSlider: NSSlider?
     private weak var muteButton: NSButton?
+    private weak var soundPauseButton: NSButton?
+    private weak var soundLabelItem: NSMenuItem?
     private var muteSymbol: String { model.audioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill" }
+    private var soundPauseSymbol: String { model.audioUserPaused ? "play.fill" : "pause.fill" }
+
+    /// Inline transport for the ambient sound: pause/play + skip to the next sound.
+    private func transportItem() -> NSMenuItem {
+        let item = NSMenuItem()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 232, height: 24))
+        let pauseBtn = NSButton(frame: NSRect(x: 38, y: 2, width: 30, height: 20))
+        pauseBtn.isBordered = false; pauseBtn.imagePosition = .imageOnly
+        pauseBtn.image = NSImage(systemSymbolName: soundPauseSymbol, accessibilityDescription: "Pause sound")
+        pauseBtn.target = self; pauseBtn.action = #selector(toggleSoundPaused)
+        let skipBtn = NSButton(frame: NSRect(x: 78, y: 2, width: 30, height: 20))
+        skipBtn.isBordered = false; skipBtn.imagePosition = .imageOnly
+        skipBtn.image = NSImage(systemSymbolName: "forward.fill", accessibilityDescription: "Skip to next sound")
+        skipBtn.target = self; skipBtn.action = #selector(skipSoundAction)
+        container.addSubview(pauseBtn); container.addSubview(skipBtn)
+        item.view = container
+        soundPauseButton = pauseBtn
+        return item
+    }
 
     /// An inline volume slider with a clickable speaker that mutes/unmutes the one ambient sound.
     private func volumeItem() -> NSMenuItem {
@@ -211,6 +234,17 @@ final class StatusBarController: NSObject {
         muteButton?.image = NSImage(systemSymbolName: muteSymbol, accessibilityDescription: "Mute")
     }
     @objc private func removeSound() { if let item = model.currentItem { model.setSound(nil, for: item) } }
+    @objc private func toggleSoundPaused() {
+        model.toggleSoundPaused()
+        soundPauseButton?.image = NSImage(systemSymbolName: soundPauseSymbol, accessibilityDescription: "Pause sound")
+    }
+    @objc private func skipSoundAction() {
+        model.skipSound()
+        soundPauseButton?.image = NSImage(systemSymbolName: soundPauseSymbol, accessibilityDescription: "Pause sound")
+        if let item = model.currentItem, let url = model.soundURL(for: item) {
+            soundLabelItem?.title = "Sound: \(SystemSounds.displayName(for: url) ?? url.lastPathComponent)"
+        }
+    }
     @objc private func volumeChanged(_ sender: NSSlider) {
         model.audioVolume = Float(sender.doubleValue)
         muteButton?.image = NSImage(systemSymbolName: muteSymbol, accessibilityDescription: "Mute")

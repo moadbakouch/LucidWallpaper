@@ -130,6 +130,18 @@ final class FeatureSelfTest {
         model.setUserPaused(false)
         let resumed = model.audio.debugIsPlaying
         record("audio-pause", silenced && resumed, "silenced=\(silenced) resumed=\(resumed)")
+        // The ambient sound's own play/pause + skip-to-next.
+        if let item = model.currentItem {
+            model.toggleSoundPaused()
+            let sPaused = model.audioUserPaused && !model.audio.debugIsPlaying
+            model.toggleSoundPaused()
+            let sResumed = !model.audioUserPaused && model.audio.debugIsPlaying
+            let before = model.soundURL(for: item)?.lastPathComponent ?? "?"
+            model.skipSound()
+            let after = model.soundURL(for: item)?.lastPathComponent ?? "?"
+            record("sound-transport", sPaused && sResumed && before != after && model.audio.debugIsPlaying,
+                   "pause=\(sPaused) resume=\(sResumed) skip=\(before)->\(after)")
+        }
         if let item = model.currentItem { model.setSound(nil, for: item) }
         model.audioVolume = 0
         testPlaylist()

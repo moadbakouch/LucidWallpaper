@@ -324,12 +324,38 @@ final class AppModel: ObservableObject {
     }
     func soundURL(for item: WallpaperItem) -> URL? { library.soundURL(for: item.id) }
 
+    /// User play/pause for just the ambient sound (independent of the wallpaper's pause).
+    @Published private(set) var audioUserPaused = false
+
+    func toggleSoundPaused() {
+        audioUserPaused.toggle()
+        reconcileAudio()
+    }
+
+    /// Skip to the next macOS ambient sound for the current wallpaper (wraps around).
+    func skipSound() {
+        guard let item = currentItem, !SystemSounds.all.isEmpty else { return }
+        let sounds = SystemSounds.all
+        let currentPath = library.soundURL(for: item.id)?.path
+        let idx = currentPath.flatMap { p in sounds.firstIndex { $0.url.path == p } } ?? -1
+        audioUserPaused = false                       // skipping should let you hear it
+        setSound(sounds[(idx + 1) % sounds.count].url, for: item)
+        reconcileAudio()
+    }
+
+    /// The single audio player runs only when nothing (wallpaper pause or the sound's own pause)
+    /// suspends it. `updateAudio` just loads the right sound; this decides whether it plays.
+    private func reconcileAudio() {
+        if windowManager.isPaused || audioUserPaused { audio.suspend() }
+        else { audio.resume(); updateAudio() }
+    }
+
     private func updateAudio() {
-        guard audioVolume > 0, !windowManager.isPaused, let item = library.currentItem,
+        guard audioVolume > 0, let item = library.currentItem,
               let url = library.soundURL(for: item.id), FileManager.default.fileExists(atPath: url.path) else {
             audio.setSound(nil); return
         }
-        audio.setSound(url)
+        audio.setSound(url)   // AudioController only actually plays it when not suspended
     }
 
     // Updates & iCloud sync.
@@ -514,9 +540,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Keep ambient audio in sync with the wallpaper's global pause state.
-    private func handleGlobalPause(_ paused: Bool) {
-        if paused { audio.suspend() } else { audio.resume(); updateAudio() }
-    }
+    private func handleGlobalPause(_ paused: Bool) { reconcileAudio() }
 
     func togglePause() { setUserPaused(!isUserPaused) }
 
