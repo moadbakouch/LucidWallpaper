@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 /// Runtime simulation of every feature, driven in-process when LUCIDWALL_FEATURE_TEST is set.
 /// Each check logs `[FEATURETEST] <name>: PASS|FAIL <detail>`; a SUMMARY line ends the run and
@@ -33,6 +34,9 @@ final class FeatureSelfTest {
         testWatchers()
         testPerDisplay()
         testLiquidGlass()
+        testGallery()
+        testLivelyJSON()
+        testCreator()
         testAudio()
         // Async chains: audio settle -> playlist -> shader -> summary.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.checkAudioThenPlaylist() }
@@ -126,6 +130,26 @@ final class FeatureSelfTest {
         }
     }
 
+    private func testGallery() {
+        // Bundled preview catalog is present, and the remote-feed JSON shape decodes (the
+        // download/thumbnail key mapping that lets the marketplace grow without an app update).
+        let json = Data("""
+        [{"title":"X","author":"Y","download":"https://example.com/a.zip","preview":"https://example.com/p.gif","thumbnail":"https://example.com/t.jpg","license":"Open"}]
+        """.utf8)
+        let decoded = (try? JSONDecoder().decode([GalleryItem].self, from: json)) ?? []
+        let first = decoded.first
+        // Every Store card must have at least one image (animated preview or static thumbnail);
+        // the grid uses `thumbnailURL ?? previewURL`, so thumbnail-only items are valid.
+        let ok = Gallery.curated.allSatisfy { $0.previewURL != nil || $0.thumbnailURL != nil }
+            && !Gallery.curated.isEmpty
+            && decoded.count == 1
+            && first?.title == "X" && first?.author == "Y"
+            && first?.downloadURL.absoluteString == "https://example.com/a.zip"
+            && first?.previewURL?.absoluteString == "https://example.com/p.gif"
+            && first?.thumbnailURL?.absoluteString == "https://example.com/t.jpg"
+        record("gallery", ok, "curated=\(Gallery.curated.count) feedDecode=\(decoded.count)")
+    }
+
     private func testAudio() {
         // Use a macOS built-in Background Sound (Rain/Ocean/…) to also exercise SystemSounds.
         let url = SystemSounds.all.first?.url ?? URL(fileURLWithPath: "/System/Library/Sounds/Ping.aiff")
@@ -202,9 +226,97 @@ final class FeatureSelfTest {
                         self.record("shader-brightness", ok, "lum1=\(lum1.map { String(format: "%.3f", $0) } ?? "nil") lum2=\(lum2.map { String(format: "%.3f", $0) } ?? "nil")")
                         self.model.windowManager.setProperty("speed", value: .number(2.0))
                         self.record("shader-speed", true, "applied 2x")
-                        self.finish()
+                        self.testWebRuntime()
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: Store compatibility + Creator
+
+    /// Lively manifests with comments / trailing commas / odd types must still yield controls, and
+    /// folderDropdown values must reach the page as "folder/file".
+    private func testLivelyJSON() {
+        let json = """
+        \u{FEFF}{
+          // a comment Lively tolerates
+          "speed": { "type": "Slider", "value": 3, "min": "0", "max": 10, "step": 1, },
+          /* block comment */
+          "bg": { "type": "folderdropdown", "value": "a.jpg", "folder": "imgs", "filter": "*.jpg|*.png" },
+          "go": { "type": "button", "value": "Reset" },
+          "bad": [1, 2, 3],
+        }
+        """
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lw-props-\(UUID().uuidString).json")
+        try? json.write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let entries = LivelyPropertySchema.load(url)
+        let defaults = LivelyPropertySchema.defaults(url)
+        let folders = LivelyPropertySchema.folders(url)
+        let mapped = defaults["bg"].map { LivelyPropertySchema.pageValue($0, folder: folders["bg"]) }
+        let ok = entries.map(\.name) == ["speed", "bg", "go"]
+            && entries.first?.property.min == 0
+            && defaults["go"] == nil                       // buttons never fire on load
+            && mapped == .string("imgs/a.jpg")
+        record("lively-json", ok, "entries=\(entries.map(\.name)) mapped=\(String(describing: mapped))")
+    }
+
+    /// Creator: draft → save → the package is a valid Lively wallpaper whose properties read back
+    /// into the same config (Edit in Creator), then clean up.
+    private func testCreator() {
+        var config = CreatorPreset.all[3].config
+        config.customText = "Hello"
+        config.textSize = 21
+        do {
+            let draft = try WallpaperCreator.makeDraft(config: config)
+            let item = try WallpaperCreator.save(draft: draft, config: config, title: "FeatureTest Creation",
+                                                 thumbnail: nil, existing: nil)
+            model.saveCreation(item, apply: false, replacing: false)
+            let dir = item.contentURL.deletingLastPathComponent()
+            let fm = FileManager.default
+            let files = ["index.html", "config.js", "LivelyInfo.json", "LivelyProperties.json"]
+                .allSatisfy { fm.fileExists(atPath: dir.appendingPathComponent($0).path) }
+            let back = CreatorConfig(values: model.resolvedProperties(for: item))
+            let inLibrary = model.items.contains { $0.id == item.id } && model.isCreation(item)
+            let entries = model.propertyEntries(for: item).count
+            record("creator-save", files && inLibrary && back == config && entries > 20,
+                   "files=\(files) inLibrary=\(inLibrary) roundtrip=\(back == config) entries=\(entries)")
+            model.remove(item)
+            WallpaperCreator.discardDrafts()
+        } catch {
+            record("creator-save", false, "\(error)")
+        }
+    }
+
+    /// The macOS web runtime: a package page can fetch() its own JSON (blocked under file://),
+    /// resolve a wrong-case path, sees English locale, and has the geolocation shim.
+    private func testWebRuntime() {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("lw-runtime-\(UUID().uuidString)")
+        try? fm.createDirectory(at: dir.appendingPathComponent("Data"), withIntermediateDirectories: true)
+        try? #"{"v": 42}"#.write(to: dir.appendingPathComponent("Data/info.json"), atomically: true, encoding: .utf8)
+        try? "{}".write(to: dir.appendingPathComponent("LivelyProperties.json"), atomically: true, encoding: .utf8)
+        let html = """
+        <html><body><script>
+        window.result = 'pending';
+        fetch('data/INFO.json').then(function(r){ return r.json(); }).then(function(j){
+          var d = new Date(2026, 0, 15).toLocaleDateString('fr-FR', { month: 'long' });
+          window.result = [j.v, navigator.language, d, typeof navigator.geolocation.getCurrentPosition, window.isSecureContext].join('|');
+        }).catch(function(e){ window.result = 'error:' + e; });
+        </script></body></html>
+        """
+        try? html.write(to: dir.appendingPathComponent("index.html"), atomically: true, encoding: .utf8)
+        let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 200),
+                            configuration: WebWallpaperRuntime.makeConfiguration())
+        WebWallpaperRuntime.load(dir.appendingPathComponent("index.html"), in: web)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            web.evaluateJavaScript("window.result") { value, _ in
+                let result = value as? String ?? "nil"
+                self?.record("web-runtime", result == "42|en-US|January|function|true", result)
+                try? fm.removeItem(at: dir)
+                _ = web
+                self?.finish()
             }
         }
     }

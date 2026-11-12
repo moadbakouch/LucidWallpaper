@@ -24,10 +24,18 @@ extension AppDelegate {
         appMenu.addItem(withTitle: "Quit LucidWallpaper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         addSubmenu(mainMenu, appMenu)
 
-        // File
+        // File - "Add your own" lives here (and via drag-and-drop onto the window); the Store tab
+        // is a pure marketplace.
         let fileMenu = NSMenu(title: "File")
+        addAppItem(fileMenu, "Create Wallpaper…", #selector(createWallpaperAction(_:)), "n")
+        fileMenu.addItem(.separator())
         addAppItem(fileMenu, "Import Lively Wallpaper…", #selector(importLivelyAction(_:)), "i")
         addAppItem(fileMenu, "Add Video…", #selector(addVideoAction(_:)), "o")
+        addAppItem(fileMenu, "Add Image or GIF…", #selector(addImageAction(_:)))
+        addAppItem(fileMenu, "Add Photo Slideshow…", #selector(addSlideshowAction(_:)))
+        addAppItem(fileMenu, "Add Web Page…", #selector(addWebPageAction(_:)))
+        addAppItem(fileMenu, "Add Shadertoy…", #selector(addShadertoyAction(_:)))
+        addAppItem(fileMenu, "Add Built-in Shader", #selector(addBuiltInShaderAction(_:)))
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         addSubmenu(mainMenu, fileMenu)
@@ -94,6 +102,11 @@ extension AppDelegate {
     @objc func randomWallpaperAction(_ sender: Any?) { model.randomWallpaper() }
     @objc func removeWallpaperAction(_ sender: Any?) { model.clear() }
 
+    @objc func createWallpaperAction(_ sender: Any?) {
+        model.settingsTab = "create"
+        settingsWindow.show()
+    }
+
     @objc func importLivelyAction(_ sender: Any?) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.zip, .folder]
@@ -112,6 +125,62 @@ extension AppDelegate {
         let item = WallpaperItem(title: url.deletingPathExtension().lastPathComponent, kind: .video, contentURL: url)
         model.apply(item, addToLibrary: true)
         settingsWindow.show()
+    }
+
+    @objc func addImageAction(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image, .gif]
+        panel.prompt = "Add"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let kind: WallpaperKind = url.pathExtension.lowercased() == "gif" ? .gif : .image
+        model.apply(WallpaperItem(title: url.deletingPathExtension().lastPathComponent, kind: kind, contentURL: url),
+                    addToLibrary: true)
+        settingsWindow.show()
+    }
+
+    @objc func addSlideshowAction(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.prompt = "Use Folder"
+        panel.message = "Choose a folder of photos to pan & crossfade through."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.apply(.slideshow(folder: url), addToLibrary: true)
+        settingsWindow.show()
+    }
+
+    @objc func addWebPageAction(_ sender: Any?) {
+        guard let item = promptURLWallpaper(title: "Add Web Page Wallpaper",
+                                            info: "Paste any web page URL - a clock, dashboard, weather page, or web art.",
+                                            placeholder: "https://example.com", WallpaperItem.webPage) else { return }
+        model.apply(item, addToLibrary: true); settingsWindow.show()
+    }
+
+    @objc func addShadertoyAction(_ sender: Any?) {
+        guard let item = promptURLWallpaper(title: "Add Shadertoy Wallpaper",
+                                            info: "Paste a Shadertoy URL (shadertoy.com/view/…) or shader id.",
+                                            placeholder: "https://www.shadertoy.com/view/…", WallpaperItem.shadertoy) else { return }
+        model.apply(item, addToLibrary: true); settingsWindow.show()
+    }
+
+    @objc func addBuiltInShaderAction(_ sender: Any?) {
+        guard let item = WallpaperItem.bundledShader("plasma", title: "Plasma") else { return }
+        model.apply(item, addToLibrary: true); settingsWindow.show()
+    }
+
+    /// Prompt for a URL/string and build a wallpaper from it (web page / Shadertoy).
+    private func promptURLWallpaper(title: String, info: String, placeholder: String,
+                                    _ make: (String) -> WallpaperItem?) -> WallpaperItem? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = info
+        alert.addButton(withTitle: "Add"); alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.placeholderString = placeholder
+        alert.accessoryView = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        guard let item = make(field.stringValue) else { NSSound.beep(); return nil }
+        return item
     }
 
     private func presentMenuError(_ error: Error) {

@@ -7,10 +7,12 @@ final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let model: AppModel
     private let openSettings: () -> Void
+    private let openPreferences: () -> Void
 
-    init(model: AppModel, openSettings: @escaping () -> Void) {
+    init(model: AppModel, openSettings: @escaping () -> Void, openPreferences: @escaping () -> Void) {
         self.model = model
         self.openSettings = openSettings
+        self.openPreferences = openPreferences
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -91,14 +93,36 @@ final class StatusBarController: NSObject {
             let rand = addItem(to: menu, title: "Random", action: #selector(randomWallpaper), key: "r"); rand.isEnabled = model.items.count > 1
             if !model.items.isEmpty {
                 menu.addItem(.separator())
+                let screens = NSScreen.screens
+                // Flat list: ONE click applies the wallpaper to all displays (the common case). This
+                // never just "expands a submenu" - that earlier behavior made clicks do nothing.
                 for item in model.items {
-                    let mi = NSMenuItem(title: item.title, action: #selector(applyLibraryItem(_:)), keyEquivalent: "")
+                    let mi = NSMenuItem(title: item.title, action: #selector(applyItemAllDisplays(_:)), keyEquivalent: "")
                     mi.target = self
                     mi.representedObject = item.id.uuidString
-                    mi.state = (model.currentItemID == item.id) ? .on : .off
+                    mi.state = screens.allSatisfy { screenShows(item, on: $0) } ? .on : .off
                     if let thumb = ThumbnailProvider.cachedImage(for: item) { mi.image = Self.menuThumbnail(thumb) }
                     else { Task { _ = await ThumbnailProvider.image(for: item) } }
                     menu.addItem(mi)
+                }
+                // Per-display targeting (only with 2+ displays): pick a monitor, then a wallpaper.
+                if screens.count > 1 {
+                    menu.addItem(.separator())
+                    for screen in screens {
+                        let parent = NSMenuItem(title: "Set on \(screen.localizedName)", action: nil, keyEquivalent: "")
+                        parent.image = NSImage(systemSymbolName: "display", accessibilityDescription: nil)
+                        let sub = NSMenu()
+                        for item in model.items {
+                            let d = NSMenuItem(title: item.title, action: #selector(applyItemToDisplay(_:)), keyEquivalent: "")
+                            d.target = self
+                            d.representedObject = ["item": item.id.uuidString, "display": String(screen.displayID)]
+                            d.state = (model.displayWallpaperID(screen.displayID) == item.id) ? .on : .off
+                            if let thumb = ThumbnailProvider.cachedImage(for: item) { d.image = Self.menuThumbnail(thumb) }
+                            sub.addItem(d)
+                        }
+                        parent.submenu = sub
+                        menu.addItem(parent)
+                    }
                 }
             }
             menu.addItem(.separator())
@@ -108,6 +132,8 @@ final class StatusBarController: NSObject {
 
     private func addSubmenu() -> NSMenuItem {
         submenu("Add Wallpaper", image: "plus") { menu in
+            addItem(to: menu, title: "Create Your Own…", action: #selector(openCreator))
+            menu.addItem(.separator())
             addItem(to: menu, title: "Set Video…", action: #selector(chooseVideo))
             addItem(to: menu, title: "Set Web Page…", action: #selector(chooseWeb))
             addItem(to: menu, title: "Import Lively Package…", action: #selector(importLively))
@@ -176,7 +202,8 @@ final class StatusBarController: NSObject {
     // MARK: Actions
 
     @objc private func showLibrary() { model.settingsTab = "videos"; openSettings() }
-    @objc private func showSettingsTab() { model.settingsTab = "settings"; openSettings() }
+    @objc private func openCreator() { model.settingsTab = "create"; openSettings() }
+    @objc private func showSettingsTab() { openPreferences() }   // Settings = its own window
 
     @objc private func importLively() {
         let panel = NSOpenPanel()
@@ -213,6 +240,22 @@ final class StatusBarController: NSObject {
         guard let idString = sender.representedObject as? String,
               let item = model.items.first(where: { $0.id.uuidString == idString }) else { return }
         model.apply(item, addToLibrary: false)
+    }
+
+    /// Apply a wallpaper to every display (switches back to Mirror).
+    @objc private func applyItemAllDisplays(_ sender: NSMenuItem) {
+        guard let idString = sender.representedObject as? String,
+              let item = model.items.first(where: { $0.id.uuidString == idString }) else { return }
+        model.applyToAllDisplays(item)
+    }
+
+    /// Apply a wallpaper to one specific display (switches to Independent mode).
+    @objc private func applyItemToDisplay(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? [String: String],
+              let idString = info["item"], let displayStr = info["display"],
+              let displayID = CGDirectDisplayID(displayStr),
+              let item = model.items.first(where: { $0.id.uuidString == idString }) else { return }
+        model.applyToDisplay(item, displayID: displayID)
     }
 
     @objc private func togglePause() {
@@ -255,6 +298,16 @@ final class StatusBarController: NSObject {
     }
 
     // MARK: Helpers
+
+    /// Whether `item` is the wallpaper currently shown on `screen` (accounts for mirror/span vs.
+    /// independent per-display assignments and the unassigned-display mirror fallback).
+    private func screenShows(_ item: WallpaperItem, on screen: NSScreen) -> Bool {
+        if model.monitorMode == .independent {
+            if let assigned = model.displayWallpaperID(screen.displayID) { return assigned == item.id }
+            return model.newDisplayBehavior != .blank && model.currentItemID == item.id
+        }
+        return model.currentItemID == item.id   // mirror / span show the same wallpaper everywhere
+    }
 
     /// A small aspect-fill thumbnail for a menu item.
     private static func menuThumbnail(_ image: NSImage) -> NSImage {

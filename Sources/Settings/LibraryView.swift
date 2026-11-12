@@ -2,36 +2,138 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+/// Sort order for a library tab.
+enum LibrarySort: String, CaseIterable, Identifiable {
+    case recent, oldest, name
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .recent: return "Recently Added"
+        case .oldest: return "Oldest First"
+        case .name:   return "Name (A–Z)"
+        }
+    }
+}
+
 /// One library tab, filtered to a single wallpaper kind (videos or interactive web).
 struct WallpaperGridView: View {
     @EnvironmentObject private var model: AppModel
     let kind: WallpaperKind
+    /// Widgets tab: show only widget-style wallpapers (clock / audio / system), regardless of `kind`.
+    var widgetsOnly = false
     @State private var selectedID: UUID?
     @State private var search = ""
     @State private var favoritesOnly = false
+    // Smart filters / sort.
+    @State private var sort: LibrarySort = .recent
+    @State private var typeFilter: WallpaperKind?
+    @State private var selectedTags: Set<String> = []
+    @State private var hasSoundOnly = false
+    @State private var fromStoreOnly = false
+    @State private var customMenuBarOnly = false
+    @State private var scrollTarget: UUID?   // set to scroll a revealed wallpaper into view
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: 16)]
 
     private var kindItems: [WallpaperItem] {
+        if widgetsOnly { return model.items.filter { $0.isWidgetStyle } }
         switch kind {
-        case .web:   return model.items.filter { $0.kind == .web || $0.kind == .shader }
+        case .web:   return model.items.filter { ($0.kind == .web || $0.kind == .shader) && !$0.isWidgetStyle }
         case .video: return model.items.filter { [.video, .image, .gif, .slideshow].contains($0.kind) }
         default:     return model.items.filter { $0.kind == kind }
         }
     }
 
     private var items: [WallpaperItem] {
+        _ = model.colorIndexVersion   // recompute color-based results once colors finish indexing
         var list = kindItems
+        if let typeFilter { list = list.filter { $0.kind == typeFilter } }
         if favoritesOnly { list = list.filter { model.isFavorite($0) } }
+        if hasSoundOnly { list = list.filter { model.soundURL(for: $0) != nil } }
+        if fromStoreOnly { list = list.filter { $0.sourceID != nil } }
+        if customMenuBarOnly { list = list.filter { model.menuBarStyleRaw(for: $0) != nil } }
+        if !selectedTags.isEmpty {
+            list = list.filter { !selectedTags.isDisjoint(with: Set(model.tags(for: $0))) }
+        }
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
         if !q.isEmpty {
+            // Color-aware search: every term must match. A term matches by text (name / author /
+            // description / tags); a term that's also a color word ALSO matches if the wallpaper's
+            // dominant color is that family - so "navy" finds a wallpaper titled "Navy" OR blue ones.
+            let tokens = q.split(separator: " ").map(String.init)
             list = list.filter { item in
-                item.title.lowercased().contains(q)
-                    || (item.desc?.lowercased().contains(q) ?? false)
-                    || model.tags(for: item).contains { $0.lowercased().contains(q) }
+                let family = model.colorFamily(for: item)
+                return tokens.allSatisfy { token in
+                    let textMatch = item.title.lowercased().contains(token)
+                        || (item.desc?.lowercased().contains(token) ?? false)
+                        || (item.author?.lowercased().contains(token) ?? false)
+                        || model.tags(for: item).contains { $0.lowercased().contains(token) }
+                    if let keywordFamily = ColorFamily(keyword: token) {
+                        return textMatch || family == keywordFamily
+                    }
+                    return textMatch
+                }
             }
         }
-        return list
+        return sorted(list)
+    }
+
+    private func sorted(_ list: [WallpaperItem]) -> [WallpaperItem] {
+        switch sort {
+        case .name:
+            return list.sorted(by: byName)
+        case .recent:
+            return list.sorted { a, b in
+                let da = a.dateAdded ?? .distantPast, db = b.dateAdded ?? .distantPast
+                return da == db ? byName(a, b) : da > db
+            }
+        case .oldest:
+            return list.sorted { a, b in
+                let da = a.dateAdded ?? .distantPast, db = b.dateAdded ?? .distantPast
+                return da == db ? byName(a, b) : da < db
+            }
+        }
+    }
+
+    /// Deterministic name comparison (id as final tiebreaker) so sort order never jitters.
+    private func byName(_ a: WallpaperItem, _ b: WallpaperItem) -> Bool {
+        let c = a.title.localizedCaseInsensitiveCompare(b.title)
+        return c == .orderedSame ? a.id.uuidString < b.id.uuidString : c == .orderedAscending
+    }
+
+    // Which filter options actually exist in this tab's library (so we don't show empty choices).
+    private var presentTypes: [WallpaperKind] {
+        let order: [WallpaperKind] = kind == .web ? [.web, .shader] : [.video, .image, .gif, .slideshow]
+        let present = Set(kindItems.map(\.kind))
+        return order.filter { present.contains($0) }
+    }
+    private var presentTags: [String] {
+        Set(kindItems.flatMap { model.tags(for: $0) }).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+    private var activeFilterCount: Int {
+        var n = 0
+        if typeFilter != nil { n += 1 }
+        if favoritesOnly { n += 1 }
+        if hasSoundOnly { n += 1 }
+        if fromStoreOnly { n += 1 }
+        if customMenuBarOnly { n += 1 }
+        if !selectedTags.isEmpty { n += 1 }
+        return n
+    }
+    private func clearFilters() {
+        typeFilter = nil; favoritesOnly = false; hasSoundOnly = false
+        fromStoreOnly = false; customMenuBarOnly = false; selectedTags = []
+    }
+    private func typeLabel(_ k: WallpaperKind) -> String {
+        switch k {
+        case .video: return "Video"
+        case .image: return "Image"
+        case .gif: return "GIF"
+        case .slideshow: return "Slideshow"
+        case .web: return "Web"
+        case .shader: return "Shader"
+        case .test: return "Test"
+        }
     }
 
     static let imageExtensions = ["png", "jpg", "jpeg", "heic", "heif", "gif", "tiff", "tif", "bmp", "webp"]
@@ -46,22 +148,41 @@ struct WallpaperGridView: View {
                 ContentUnavailableView("No matches", systemImage: "magnifyingglass",
                                        description: Text("Nothing matches your search or filter."))
             } else {
+                // A flexible detail column (no GeometryReader - that reported stale widths mid-resize
+                // and let the detail draw over the grid). Both sides are clipped so neither can ever
+                // overflow into the other, at any window size.
                 HStack(spacing: 0) {
-                    grid.frame(maxWidth: .infinity)
+                    grid
+                        .frame(maxWidth: .infinity)
+                        .clipped()
                     Divider()
-                    detail.frame(width: 320)
+                    detail
+                        .frame(minWidth: 260, idealWidth: 320, maxWidth: 360)
+                        .clipped()
                 }
             }
             Divider()
             HStack(spacing: 10) { importControls; Spacer() }.padding(12)
         }
-        .onAppear { selectedID = currentOrFirst }
+        .onAppear { selectedID = currentOrFirst; revealIfRequested() }
         .onChange(of: items) { _, newItems in
             // If a search/favorites filter hid the selection, fall back to the first match.
             if selectedID == nil || !newItems.contains(where: { $0.id == selectedID }) {
                 selectedID = newItems.first?.id
             }
         }
+        .onChange(of: model.revealItemID) { _, _ in revealIfRequested() }
+    }
+
+    /// Honor a "View in Library" request from the Store: clear filters so the item is visible,
+    /// select it, and consume the request.
+    private func revealIfRequested() {
+        guard let id = model.revealItemID, kindItems.contains(where: { $0.id == id }) else { return }
+        clearFilters(); search = ""
+        selectedID = id
+        model.revealItemID = nil
+        // Defer the scroll one tick so the grid has the (filter-cleared) item list laid out.
+        DispatchQueue.main.async { scrollTarget = id }
     }
 
     private var currentOrFirst: UUID? {
@@ -70,51 +191,95 @@ struct WallpaperGridView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 6) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: kind == .video ? "film" : "globe").foregroundStyle(.tint)
-                Text(headerText).font(.callout).foregroundStyle(.secondary)
-                Spacer()
-            }
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search by name, tag…", text: $search).textFieldStyle(.roundedBorder)
-                Toggle(isOn: $favoritesOnly) { Label("Favorites", systemImage: favoritesOnly ? "star.fill" : "star") }
-                    .toggleStyle(.button)
-            }
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Search name, tag, or color…", text: $search).textFieldStyle(.roundedBorder)
+            sortMenu
+            filtersMenu
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
     }
 
-    private var headerText: String {
-        switch kind {
-        case .video:
-            return "Video wallpapers - any mp4/mov/m4v/webm, looped silently and hardware-decoded. "
-                 + "Set Fill / Fit / Stretch + zoom per wallpaper. All resolutions supported."
-        default:
-            return "Interactive wallpapers - HTML/WebGL that react to your mouse. "
-                 + "Import Lively packages (.zip) and they run unchanged."
+    // Sort options listed directly (checkmark on the active one) - no nested "Sort >" submenu.
+    private var sortMenu: some View {
+        Menu {
+            ForEach(LibrarySort.allCases) { s in
+                Button { sort = s } label: {
+                    Label(s.label, systemImage: sort == s ? "checkmark" : "")
+                }
+            }
+        } label: {
+            Label(sort.label, systemImage: "arrow.up.arrow.down")
         }
+        .menuStyle(.borderlessButton).fixedSize()
+    }
+
+    private var filtersMenu: some View {
+        Menu {
+            if presentTypes.count >= 2 {
+                Picker("Type", selection: $typeFilter) {
+                    Text("All Types").tag(WallpaperKind?.none)
+                    ForEach(presentTypes, id: \.self) { k in
+                        Text(typeLabel(k)).tag(WallpaperKind?.some(k))
+                    }
+                }
+                .pickerStyle(.inline)
+            }
+            Section {
+                Toggle("Favorites", isOn: $favoritesOnly)
+                Toggle("Has ambient sound", isOn: $hasSoundOnly)
+                Toggle("Custom menu-bar color", isOn: $customMenuBarOnly)
+                Toggle("From Store", isOn: $fromStoreOnly)
+            }
+            if !presentTags.isEmpty {
+                Menu("Tags") {
+                    ForEach(presentTags, id: \.self) { tag in
+                        Toggle(tag, isOn: Binding(
+                            get: { selectedTags.contains(tag) },
+                            set: { on in if on { selectedTags.insert(tag) } else { selectedTags.remove(tag) } }))
+                    }
+                }
+            }
+            Divider()
+            Button("Clear Filters") { clearFilters() }.disabled(activeFilterCount == 0)
+        } label: {
+            Label(activeFilterCount == 0 ? "Filter" : "Filter (\(activeFilterCount))",
+                  systemImage: activeFilterCount == 0 ? "line.3.horizontal.decrease.circle"
+                                                      : "line.3.horizontal.decrease.circle.fill")
+        }
+        .menuStyle(.borderlessButton).fixedSize()
     }
 
     private var grid: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 18) {
-                ForEach(items) { item in
-                    WallpaperCell(item: item,
-                                  isCurrent: model.currentItemID == item.id,
-                                  isSelected: selectedID == item.id)
-                        .onTapGesture { selectedID = item.id }
-                        .simultaneousGesture(TapGesture(count: 2).onEnded {
-                            model.apply(item, addToLibrary: false)
-                        })
-                        .contextMenu {
-                            Button("Apply") { model.apply(item, addToLibrary: false) }
-                            Button("Remove", role: .destructive) { remove(item) }
-                        }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 18) {
+                    ForEach(items) { item in
+                        WallpaperCell(item: item,
+                                      isCurrent: model.currentItemID == item.id,
+                                      isSelected: selectedID == item.id)
+                            .id(item.id)
+                            .onTapGesture { selectedID = item.id }
+                            .simultaneousGesture(TapGesture(count: 2).onEnded {
+                                model.applyToAllDisplays(item)
+                            })
+                            .contextMenu {
+                                Button("Apply") { model.applyToAllDisplays(item) }
+                                if model.isCreation(item) {
+                                    Button("Edit in Creator") { model.editInCreator(item) }
+                                }
+                                Button("Remove", role: .destructive) { remove(item) }
+                            }
+                    }
                 }
+                .padding(18)
             }
-            .padding(18)
+            // Scroll the revealed wallpaper (from the Store's "View in Library") into view.
+            .onChange(of: scrollTarget) { _, target in
+                guard let target else { return }
+                withAnimation { proxy.scrollTo(target, anchor: .center) }
+                scrollTarget = nil
+            }
         }
     }
 
@@ -163,7 +328,7 @@ struct WallpaperGridView: View {
                 Button("Built-in Shader") { addBuiltInShader() }
                 Button("Interactive Sample") {
                     if let item = WallpaperItem.bundledWeb("particles", title: "Particles") {
-                        model.apply(item, addToLibrary: true); selectedID = item.id
+                        model.applyToAllDisplays(item, addToLibrary: true); selectedID = item.id
                     }
                 }
             } label: { Label("Add", systemImage: "plus") }
@@ -184,7 +349,7 @@ struct WallpaperGridView: View {
         let isImage = Self.imageExtensions.contains(url.pathExtension.lowercased())
         let item = WallpaperItem(title: url.deletingPathExtension().lastPathComponent,
                                  kind: isImage ? .image : .video, contentURL: url)
-        model.apply(item, addToLibrary: true)
+        model.applyToAllDisplays(item, addToLibrary: true)
         selectedID = item.id
     }
 
@@ -213,7 +378,7 @@ struct WallpaperGridView: View {
 
     private func addBuiltInShader() {
         guard let item = WallpaperItem.bundledShader("plasma", title: "Plasma") else { return }
-        model.apply(item, addToLibrary: true)
+        model.applyToAllDisplays(item, addToLibrary: true)
         selectedID = item.id
     }
 
@@ -230,7 +395,7 @@ struct WallpaperGridView: View {
         guard let item = WallpaperItem.shadertoy(field.stringValue) else {
             NSSound.beep(); return
         }
-        model.apply(item, addToLibrary: true)
+        model.applyToAllDisplays(item, addToLibrary: true)
         selectedID = item.id
     }
 }
@@ -325,6 +490,13 @@ struct WallpaperDetail: View {
                     .help("Favorite")
                     Button("Remove", role: .destructive, action: onRemoved)
                 }
+                if model.isCreation(item) {
+                    Button {
+                        model.editInCreator(item)
+                    } label: {
+                        Label("Edit in Creator", systemImage: "paintbrush.pointed")
+                    }
+                }
 
                 if item.kind == .video || item.kind == .image || item.kind == .gif || item.kind == .slideshow {
                     Divider()
@@ -348,6 +520,11 @@ struct WallpaperDetail: View {
 
                 Divider()
                 PaletteView(item: item)
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Menu Bar").font(.headline)
+                    MenuBarColorPicker(item: item)
+                }
                 Divider()
                 SoundPicker(item: item)
                 Divider()
@@ -379,7 +556,7 @@ struct WallpaperDetail: View {
         } label: {
             Label(isApplied ? "Applied" : "Apply", systemImage: isApplied ? "checkmark" : "play.fill")
         } primaryAction: {
-            screens.count > 1 ? model.applyToAllDisplays(item) : model.apply(item, addToLibrary: false)
+            model.applyToAllDisplays(item)   // primary = show on all; per-display is in the menu
         }
         .menuStyle(.button)
         .buttonStyle(.borderedProminent)

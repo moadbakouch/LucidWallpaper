@@ -93,6 +93,14 @@ final class WallpaperWindowManager {
     func setBaseDim(_ level: CGFloat) { baseDim = level; applyDim() }
     private func applyDim() { for entry in entries { entry.window.setDim(baseDim) } }
 
+    /// Strength of the top legibility scrim drawn behind the menu bar on every window (0 = off).
+    /// Stored so freshly-built windows (display changes / crossfades) pick it up.
+    private var menuBarScrim: CGFloat = 0
+    func setMenuBarScrim(_ level: CGFloat) {
+        menuBarScrim = level
+        for entry in entries { entry.window.setScrim(level) }
+    }
+
     /// Debug: dim overlay alpha on the first window (-1 if none); used by the feature test.
     var debugFirstDimAlpha: CGFloat { entries.first?.window.dimView.alphaValue ?? -1 }
     /// Debug: whether a given display's renderer is currently playing (nil if no such window).
@@ -181,18 +189,40 @@ final class WallpaperWindowManager {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         occlusionTimer?.invalidate()
         occlusionTimer = nil
+        rebuildDebounce?.invalidate()
+        rebuildDebounce = nil
         teardown()
     }
 
+    /// Called after a real display change is handled (rebuild done), so AppModel can re-apply
+    /// per-display state like menu-bar colors.
+    var onDisplaysChanged: (() -> Void)?
+    private var rebuildDebounce: Timer?
+
+    /// Debounced: plugging/unplugging (and clamshell open/close) fires several notifications in a
+    /// burst. Coalesce them so we rebuild once for the final layout instead of flickering per step.
     @objc private func screensChanged() {
+        rebuildDebounce?.invalidate()
+        let t = Timer(timeInterval: 0.35, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.performScreensChanged() }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        rebuildDebounce = t
+    }
+
+    private func performScreensChanged() {
         let sig = Self.signature(of: NSScreen.screens)
         guard sig != screenSignature else { return }   // real display change only
         rebuild()
+        onDisplaysChanged?()
     }
 
     private static func signature(of screens: [NSScreen]) -> String {
-        // Include the scale factor so a resolution/scaling change (same frame) still rebuilds.
-        screens.map { "\(NSStringFromRect($0.frame))@\($0.backingScaleFactor)" }.joined(separator: "|")
+        // Include the display ID (so swapping two identical-frame monitors rebuilds and re-binds
+        // per-display state) and the scale factor (so a resolution/scaling change rebuilds). Sorted
+        // so a pure reordering of NSScreen.screens doesn't count as a change.
+        screens.map { "\($0.displayID):\(NSStringFromRect($0.frame))@\($0.backingScaleFactor)" }
+            .sorted().joined(separator: "|")
     }
 
     @objc private func occlusionTrigger() { recomputeOcclusion() }
@@ -368,6 +398,32 @@ final class WallpaperWindowManager {
         renderer.snapshot(completion)
     }
 
+    /// Snapshot every display's current wallpaper, keyed by display id (used to keep the system
+    /// desktop picture - and therefore the menu bar - in sync). In Span mode the single window's
+    /// snapshot maps to all displays. Completes on the main thread once every snapshot returns.
+    func snapshotEachScreen(_ completion: @escaping ([CGDirectDisplayID: NSImage]) -> Void) {
+        let spanDisplays = monitorMode == .span ? NSScreen.screens.map(\.displayID) : []
+        let targets = entries.compactMap { entry -> (WallpaperRenderer, [CGDirectDisplayID])? in
+            guard let renderer = entry.renderer else { return nil }
+            let ids = entry.screen.map { [$0.displayID] } ?? spanDisplays
+            return ids.isEmpty ? nil : (renderer, ids)
+        }
+        guard !targets.isEmpty else { completion([:]); return }
+
+        // Renderer snapshot completions arrive on the main thread; accumulate via a reference box
+        // so the (non-isolated) completion closures share one result set safely.
+        final class Acc { var images: [CGDirectDisplayID: NSImage] = [:]; var remaining = 0 }
+        let acc = Acc()
+        acc.remaining = targets.count
+        for (renderer, ids) in targets {
+            renderer.snapshot { image in
+                if let image { for id in ids { acc.images[id] = image } }
+                acc.remaining -= 1
+                if acc.remaining == 0 { completion(acc.images) }
+            }
+        }
+    }
+
     /// Effective global pause state - true if any reason is active.
     var isPaused: Bool { globalPaused }
 
@@ -446,8 +502,9 @@ final class WallpaperWindowManager {
         screenSignature = Self.signature(of: NSScreen.screens)
         entries = makeEntries()
         for entry in entries {
-            entry.window.bringDimToFront()
+            entry.window.bringOverlaysToFront()
             entry.window.setDim(baseDim, animated: false)   // no fade-in flash on fresh windows
+            entry.window.setScrim(menuBarScrim, animated: false)
             entry.window.orderFront(nil)
         }
         updatePlayback()
@@ -464,8 +521,9 @@ final class WallpaperWindowManager {
         let fresh = makeEntries()
         for entry in fresh {
             entry.window.alphaValue = 0
-            entry.window.bringDimToFront()
+            entry.window.bringOverlaysToFront()
             entry.window.setDim(baseDim, animated: false)   // no fade-in flash on fresh windows
+            entry.window.setScrim(menuBarScrim, animated: false)
             entry.window.orderFront(nil)
         }
         entries = fresh

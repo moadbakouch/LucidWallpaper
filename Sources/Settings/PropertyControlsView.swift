@@ -55,6 +55,25 @@ struct PropertyControlsView: View {
                     .textFieldStyle(.roundedBorder)
             }
 
+        case "folderDropdown":
+            // Lively's file picker: the files of a package folder (e.g. alternative backgrounds).
+            let files = item.propertiesURL.map {
+                LivelyPropertySchema.folderFiles(property, packageDir: $0.deletingLastPathComponent())
+            } ?? []
+            if !files.isEmpty {
+                Picker(label, selection: stringBinding(entry)) {
+                    ForEach(files, id: \.self) { name in
+                        Text((name as NSString).deletingPathExtension).tag(name)
+                    }
+                }
+            }
+
+        case "button":
+            // A Lively button "presses" by sending its name with `true`.
+            Button(property.value.flatMap { if case .string(let s) = $0 { return s }; return nil } ?? label) {
+                model.pressButton(entry.name, for: item)
+            }
+
         case "label":
             Text(label).font(.subheadline).foregroundStyle(.secondary)
 

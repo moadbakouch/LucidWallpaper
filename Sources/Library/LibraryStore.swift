@@ -18,6 +18,11 @@ final class LibraryStore {
     private(set) var profiles: [WallpaperProfile] = []
     /// Per-wallpaper ambient sound file paths, keyed by item UUID string.
     private var soundPaths: [String: String] = [:]
+    /// Per-wallpaper menu-bar style, keyed by item UUID string. Value = "auto" or "#RRGGBB";
+    /// absent = off (the menu bar isn't managed for that wallpaper).
+    private var menuBarStyles: [String: String] = [:]
+    /// Cached dominant color hex per item (computed from its thumbnail) for the color filter.
+    private var dominantColors: [String: String] = [:]
     /// Ordered rotation playlist (empty = rotate the whole library).
     private(set) var playlist: [PlaylistEntry] = []
     /// Per-display fit/zoom overrides and manual pauses, keyed by CGDirectDisplayID string.
@@ -54,6 +59,8 @@ final class LibraryStore {
         var playlist: [PlaylistEntry]?
         var displayScalings: [String: VideoScaling]?
         var pausedDisplays: [String]?
+        var menuBarStyles: [String: String]?
+        var dominantColors: [String: String]?
     }
 
     func soundURL(for id: UUID) -> URL? {
@@ -61,6 +68,12 @@ final class LibraryStore {
     }
     func setSound(_ url: URL?, for id: UUID) {
         soundPaths[id.uuidString] = url?.path
+        save()
+    }
+
+    func menuBarStyle(for id: UUID) -> String? { menuBarStyles[id.uuidString] }
+    func setMenuBarStyle(_ value: String?, for id: UUID) {
+        menuBarStyles[id.uuidString] = value
         save()
     }
 
@@ -81,8 +94,21 @@ final class LibraryStore {
     }
 
     func add(_ item: WallpaperItem) {
+        var it = item
+        if it.dateAdded == nil {
+            // Preserve an original add-date on re-add; stamp now for genuinely new items.
+            it.dateAdded = items.first { $0.id == item.id }?.dateAdded ?? Date()
+        }
         items.removeAll { $0.id == item.id }
-        items.append(item)
+        items.append(it)
+        save()
+    }
+
+    // MARK: Dominant color (for color filtering)
+
+    func dominantColor(for id: UUID) -> String? { dominantColors[id.uuidString] }
+    func setDominantColor(_ hex: String?, for id: UUID) {
+        dominantColors[id.uuidString] = hex
         save()
     }
 
@@ -94,6 +120,8 @@ final class LibraryStore {
         favorites.remove(item.id.uuidString)
         tags[item.id.uuidString] = nil
         soundPaths[item.id.uuidString] = nil
+        menuBarStyles[item.id.uuidString] = nil
+        dominantColors[item.id.uuidString] = nil
         // Best-effort cleanup of the on-disk package.
         let dir = AppPaths.library.appendingPathComponent(item.id.uuidString, isDirectory: true)
         try? FileManager.default.removeItem(at: dir)
@@ -104,6 +132,12 @@ final class LibraryStore {
 
     func propertyOverrides(for id: UUID) -> [String: LivelyValue] {
         overrides[id.uuidString] ?? [:]
+    }
+
+    /// Drop every customization of a wallpaper (its package values become the truth again).
+    func clearOverrides(for id: UUID) {
+        overrides[id.uuidString] = nil
+        save()
     }
 
     func setOverride(_ name: String, value: LivelyValue, for id: UUID) {
@@ -177,6 +211,8 @@ final class LibraryStore {
         playlist = decoded.playlist ?? []
         displayScalings = decoded.displayScalings ?? [:]
         pausedDisplayIDs = Set(decoded.pausedDisplays ?? [])
+        menuBarStyles = decoded.menuBarStyles ?? [:]
+        dominantColors = decoded.dominantColors ?? [:]
     }
 
     private func save() {
@@ -190,7 +226,9 @@ final class LibraryStore {
                                 soundPaths: soundPaths,
                                 playlist: playlist,
                                 displayScalings: displayScalings,
-                                pausedDisplays: Array(pausedDisplayIDs))
+                                pausedDisplays: Array(pausedDisplayIDs),
+                                menuBarStyles: menuBarStyles,
+                                dominantColors: dominantColors)
         guard let data = try? JSONEncoder().encode(payload) else { return }
         try? data.write(to: AppPaths.libraryIndex, options: .atomic)
     }

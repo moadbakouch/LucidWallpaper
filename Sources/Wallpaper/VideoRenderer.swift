@@ -9,6 +9,7 @@ final class VideoRenderer: NSObject, WallpaperRenderer {
     private let playerLayer = AVPlayerLayer()
     private var player: AVQueuePlayer?
     private var looper: AVPlayerLooper?
+    private var asset: AVURLAsset?
     private var scaling = VideoScaling.default
 
     var view: NSView { host }
@@ -26,6 +27,7 @@ final class VideoRenderer: NSObject, WallpaperRenderer {
 
     func load(_ item: WallpaperItem) {
         let asset = AVURLAsset(url: item.contentURL)
+        self.asset = asset
         let template = AVPlayerItem(asset: asset)
 
         let queue = AVQueuePlayer()
@@ -48,6 +50,26 @@ final class VideoRenderer: NSObject, WallpaperRenderer {
         looper?.disableLooping()
         looper = nil
         player = nil
+        asset = nil
+    }
+
+    /// AVPlayerLayer content isn't captured by the default `cacheDisplay` snapshot (it renders in a
+    /// separate surface, yielding a black frame), so decode the current frame straight from the
+    /// asset instead. Used to keep the synced desktop picture / menu bar matching the video.
+    func snapshot(_ completion: @escaping (NSImage?) -> Void) {
+        guard let asset else { completion(nil); return }
+        let raw = player?.currentTime()
+        let time = (raw?.isValid == true && raw?.isNumeric == true) ? raw! : .zero
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        // Any nearby frame is fine for a blurred menu-bar backdrop - keeps it fast.
+        generator.requestedTimeToleranceBefore = .positiveInfinity
+        generator.requestedTimeToleranceAfter = .positiveInfinity
+        generator.generateCGImageAsynchronously(for: time) { [generator] cg, _, _ in
+            _ = generator   // retain until the callback fires
+            let image = cg.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
+            DispatchQueue.main.async { completion(image) }
+        }
     }
 
     func applyVideoScaling(_ scaling: VideoScaling) {

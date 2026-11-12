@@ -5,6 +5,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private var statusBar: StatusBarController!
     var settingsWindow: SettingsWindowController!
+    var preferencesWindow: PreferencesWindowController!
     private var onboarding: OnboardingWindowController?
     private var commandPalette: CommandPaletteController?
     private var feedbackWindow: FeedbackWindowController?
@@ -16,9 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.start()
         setupMainMenu()
         settingsWindow = SettingsWindowController(model: model)
-        statusBar = StatusBarController(model: model, openSettings: { [weak self] in
-            self?.settingsWindow.show()
-        })
+        preferencesWindow = PreferencesWindowController(model: model)
+        statusBar = StatusBarController(model: model,
+            openSettings: { [weak self] in self?.settingsWindow.show() },
+            openPreferences: { [weak self] in self?.preferencesWindow.show() })
 
         let palette = CommandPaletteController(model: model)
         commandPalette = palette
@@ -153,7 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func openSettingsWindow() {
-        settingsWindow.show()
+        preferencesWindow.show()   // Settings is its own window, opened from the menu bar only
     }
 
     private func showOnboarding() {

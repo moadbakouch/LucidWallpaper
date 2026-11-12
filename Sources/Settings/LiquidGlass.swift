@@ -34,6 +34,22 @@ extension View {
 
     /// A prominent action button: Liquid Glass on macOS 26+, else `.borderedProminent`.
     func glassProminentButton() -> some View { modifier(GlassProminentButtonModifier()) }
+
+    /// A sample glass card (for the Appearance preview): real Liquid Glass on macOS 26+, frosted
+    /// `.regularMaterial` fallback otherwise.
+    func glassSample() -> some View { modifier(GlassSampleModifier()) }
+}
+
+private struct GlassSampleModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *), LiquidGlass.isEnabled {
+            content.padding(.horizontal, 22).padding(.vertical, 14)
+                .glassEffect(.regular, in: .rect(cornerRadius: 18))
+        } else {
+            content.padding(.horizontal, 22).padding(.vertical, 14)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        }
+    }
 }
 
 private struct WidgetGlassModifier: ViewModifier {

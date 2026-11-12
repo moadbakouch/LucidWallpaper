@@ -125,11 +125,10 @@ final class EnvironmentFeeder {
     }
 
     static func fetchLocation() async -> (lat: Double, lon: Double, city: String)? {
-        guard let url = URL(string: "https://ipapi.co/json/") else { return nil }
-        guard let (data, _) = try? await URLSession.shared.data(from: url),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let lat = obj["latitude"] as? Double, let lon = obj["longitude"] as? Double else { return nil }
-        return (lat, lon, (obj["city"] as? String) ?? "")
+        // Shared with the web wallpapers' geolocation shim: one lookup per session, with a
+        // fallback provider when ipapi.co rate-limits.
+        guard let c = await IPLocation.current() else { return nil }
+        return (c.lat, c.lon, c.city)
     }
 
     static func fetchOpenMeteo(lat: Double, lon: Double) async -> [String: Any]? {

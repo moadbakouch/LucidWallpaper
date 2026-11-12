@@ -9,37 +9,60 @@ final class GlobalHotKeys {
     private var refs: [EventHotKeyRef?] = []
     private var eventHandler: EventHandlerRef?
     private var nextID: UInt32 = 1
+    /// Actions whose chord couldn't be registered (already claimed by another app), so the UI can
+    /// warn the user instead of the hotkey silently doing nothing.
+    private(set) var failedActions: Set<HotkeyAction> = []
 
-    /// Default chord: ⌃⌥⌘ + key (rarely conflicts with other apps).
-    private static let modifiers = UInt32(controlKey | optionKey | cmdKey)
+    func isConflicted(_ action: HotkeyAction) -> Bool { failedActions.contains(action) }
 
+    /// Register every action's hotkey using the user's custom binding (or its built-in default).
     func registerDefaults(model: AppModel) {
         installHandlerIfNeeded()
-        register(keyCode: UInt32(kVK_ANSI_P), modifiers: Self.modifiers) { model.togglePause() }
-        register(keyCode: UInt32(kVK_ANSI_RightBracket), modifiers: Self.modifiers) { model.cycleWallpaper(by: 1) }
-        register(keyCode: UInt32(kVK_ANSI_LeftBracket), modifiers: Self.modifiers) { model.cycleWallpaper(by: -1) }
-        register(keyCode: UInt32(kVK_ANSI_R), modifiers: Self.modifiers) { model.randomWallpaper() }
-        register(keyCode: UInt32(kVK_ANSI_D), modifiers: Self.modifiers) { model.toggleDim() }
-        register(keyCode: UInt32(kVK_Space), modifiers: Self.modifiers) { model.requestCommandPalette?() }
+        failedActions.removeAll()
+        for action in HotkeyAction.allCases {
+            let cfg = HotkeyStore.config(for: action)
+            let ok = register(keyCode: cfg.keyCode, modifiers: cfg.modifiers) { [weak model] in
+                guard let model else { return }
+                Self.perform(action, on: model)
+            }
+            if !ok { failedActions.insert(action) }
+        }
+    }
+
+    /// Map an action to its AppModel call.
+    private static func perform(_ action: HotkeyAction, on model: AppModel) {
+        switch action {
+        case .pause:    model.togglePause()
+        case .next:     model.cycleWallpaper(by: 1)
+        case .previous: model.cycleWallpaper(by: -1)
+        case .random:   model.randomWallpaper()
+        case .dim:      model.toggleDim()
+        case .palette:  model.requestCommandPalette?()
+        }
     }
 
     func unregisterAll() {
         for ref in refs { if let ref { UnregisterEventHotKey(ref) } }
         refs.removeAll()
         handlers.removeAll()
+        failedActions.removeAll()
         if let eventHandler { RemoveEventHandler(eventHandler); self.eventHandler = nil }
     }
 
     // MARK: Internals
 
-    private func register(keyCode: UInt32, modifiers: UInt32, handler: @escaping () -> Void) {
+    /// Returns true if the chord was registered; false if the OS rejected it (already in use).
+    @discardableResult
+    private func register(keyCode: UInt32, modifiers: UInt32, handler: @escaping () -> Void) -> Bool {
         let id = nextID
         nextID += 1
-        handlers[id] = handler
         let hkID = EventHotKeyID(signature: OSType(0x4C575031) /* 'LWP1' */, id: id)
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(keyCode, modifiers, hkID, GetEventDispatcherTarget(), 0, &ref)
-        if status == noErr { refs.append(ref) }
+        guard status == noErr else { return false }   // don't keep a handler for an unbound id
+        handlers[id] = handler
+        refs.append(ref)
+        return true
     }
 
     private func installHandlerIfNeeded() {

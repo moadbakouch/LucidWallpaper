@@ -5,21 +5,33 @@ import WebKit
 /// Generates and caches preview images for wallpapers:
 /// video → a frame; Lively package → its thumbnail/preview; web → an offscreen snapshot.
 enum ThumbnailProvider {
-    private static var memory: [UUID: NSImage] = [:]   // touched on the main actor
+    // Bounded in-memory cache (was an unbounded dictionary that held every decoded preview for the
+    // whole session). NSCache auto-evicts under memory pressure; the cost/count limits cap RAM.
+    private static let memory: NSCache<NSUUID, NSImage> = {
+        let c = NSCache<NSUUID, NSImage>()
+        c.countLimit = 120
+        c.totalCostLimit = 64 * 1024 * 1024   // ~64 MB of decoded previews
+        return c
+    }()
+    private static func cache(_ image: NSImage, _ id: UUID) {
+        let cost = (image.representations.first as? NSBitmapImageRep).map { $0.pixelsWide * $0.pixelsHigh * 4 }
+            ?? Int(image.size.width * image.size.height) * 4
+        memory.setObject(image, forKey: id as NSUUID, cost: cost)
+    }
 
     @MainActor
     static func image(for item: WallpaperItem) async -> NSImage? {
-        if let cached = memory[item.id] { return cached }
+        if let cached = memory.object(forKey: item.id as NSUUID) { return cached }
 
         // Disk cache.
         let diskURL = AppPaths.thumbnails.appendingPathComponent("\(item.id.uuidString).png")
         if let data = try? Data(contentsOf: diskURL), let image = NSImage(data: data) {
-            memory[item.id] = image
+            cache(image, item.id)
             return image
         }
 
         guard let image = await generate(item) else { return nil }
-        memory[item.id] = image
+        cache(image, item.id)
         if let tiff = image.tiffRepresentation,
            let rep = NSBitmapImageRep(data: tiff),
            let png = rep.representation(using: .png, properties: [:]) {
@@ -86,10 +98,10 @@ enum ThumbnailProvider {
     /// For UI that can't await (e.g. building an NSMenu).
     @MainActor
     static func cachedImage(for item: WallpaperItem) -> NSImage? {
-        if let img = memory[item.id] { return img }
+        if let img = memory.object(forKey: item.id as NSUUID) { return img }
         let diskURL = AppPaths.thumbnails.appendingPathComponent("\(item.id.uuidString).png")
         if let data = try? Data(contentsOf: diskURL), let image = NSImage(data: data) {
-            memory[item.id] = image
+            cache(image, item.id)
             return image
         }
         return nil
@@ -98,7 +110,7 @@ enum ThumbnailProvider {
     /// Invalidate a cached preview (e.g. when a wallpaper is removed).
     @MainActor
     static func invalidate(_ id: UUID) {
-        memory[id] = nil
+        memory.removeObject(forKey: id as NSUUID)
         try? FileManager.default.removeItem(at: AppPaths.thumbnails.appendingPathComponent("\(id.uuidString).png"))
     }
 }
@@ -125,6 +137,7 @@ private final class WebThumbnailRenderer: NSObject, WKNavigationDelegate {
     private var continuation: CheckedContinuation<NSImage?, Never>?
     private var finished = false
     private var defaults: [String: LivelyValue] = [:]
+    private var folders: [String: String] = [:]
 
     static func snapshot(_ item: WallpaperItem) async -> NSImage? {
         let renderer = WebThumbnailRenderer()
@@ -133,13 +146,21 @@ private final class WebThumbnailRenderer: NSObject, WKNavigationDelegate {
 
     private func run(_ item: WallpaperItem) async -> NSImage? {
         defaults = LivelyPropertySchema.defaults(item.propertiesURL)
+        folders = LivelyPropertySchema.folders(item.propertiesURL)
         let url = item.contentURL
         return await withCheckedContinuation { cont in
             self.continuation = cont
             let frame = CGRect(x: 0, y: 0, width: 960, height: 600)
-            let web = WKWebView(frame: frame)
+            // Same runtime as the live wallpaper (package scheme + shims), so a page that renders
+            // on the desktop also renders its thumbnail.
+            let web = WKWebView(frame: frame,
+                                configuration: WebWallpaperRuntime.makeConfiguration(includeMouseBridge: false,
+                                                                                     includeFPSCap: false))
             web.navigationDelegate = self
             web.setValue(false, forKey: "drawsBackground")
+            // Off-screen windows count as occluded, which freezes requestAnimationFrame - so
+            // rAF-only pages would snapshot black. Opt this view out (WebKit SPI, guarded).
+            WebWallpaperRuntime.disableOcclusionThrottling(web)
             let win = NSWindow(contentRect: frame, styleMask: .borderless, backing: .buffered, defer: false)
             win.alphaValue = 0
             win.contentView = web
@@ -148,11 +169,7 @@ private final class WebThumbnailRenderer: NSObject, WKNavigationDelegate {
             self.webView = web
             self.window = win
 
-            if url.isFileURL {
-                web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-            } else {
-                web.load(URLRequest(url: url))
-            }
+            WebWallpaperRuntime.load(url, in: web)
             // Safety timeout in case the page never finishes loading.
             DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in self?.finish(nil) }
         }
@@ -164,7 +181,8 @@ private final class WebThumbnailRenderer: NSObject, WKNavigationDelegate {
             var js = "if(window.livelyPropertyListener){"
             for (name, value) in defaults {
                 let safe = name.replacingOccurrences(of: "\"", with: "\\\"")
-                js += "window.livelyPropertyListener(\"\(safe)\", \(value.jsLiteral));"
+                let v = LivelyPropertySchema.pageValue(value, folder: folders[name])
+                js += "try{window.livelyPropertyListener(\"\(safe)\", \(v.jsLiteral));}catch(e){}"
             }
             js += "}"
             webView.evaluateJavaScript(js, completionHandler: nil)

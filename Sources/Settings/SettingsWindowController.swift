@@ -19,10 +19,14 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             let win = NSWindow(contentViewController: host)
             win.title = "LucidWallpaper"
             win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-            win.setContentSize(NSSize(width: 780, height: 580))
-            win.minSize = NSSize(width: 640, height: 480)
+            // Integrate the SwiftUI-installed toolbar (which carries the sidebar toggle) into the
+            // glass title bar instead of a separate bar below it.
+            win.toolbarStyle = .unified
+            win.setContentSize(NSSize(width: 900, height: 600))
+            win.minSize = NSSize(width: 720, height: 500)
             win.isReleasedWhenClosed = false
             win.delegate = self
+            GlassWindow.apply(to: win)
             win.center()
             window = win
         }
@@ -32,7 +36,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        // Back to a quiet menu-bar agent when the window is dismissed.
-        NSApp.setActivationPolicy(.accessory)
+        // Back to a quiet menu-bar agent when no other app window remains visible.
+        if !NSApp.windows.contains(where: { $0.isVisible && $0 !== window }) {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 }

@@ -12,6 +12,8 @@ final class LucidWallpaperSaverView: ScreenSaverView {
     private var playerLayer: AVPlayerLayer?
     private var webView: WKWebView?
     private var shader: SaverShader?
+    /// Telemetry feeds (time / theme / weather / now-playing / system) for web wallpapers.
+    private var feeds: SaverFeeds?
 
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
@@ -31,8 +33,8 @@ final class LucidWallpaperSaverView: ScreenSaverView {
         animationTimeInterval = 1.0 / 60.0
     }
 
-    override func startAnimation() { super.startAnimation(); player?.play() }
-    override func stopAnimation() { super.stopAnimation(); player?.pause() }
+    override func startAnimation() { super.startAnimation(); player?.play(); feeds?.start() }
+    override func stopAnimation() { super.stopAnimation(); player?.pause(); feeds?.stop() }
 
     /// Drives shader rendering; video/web animate themselves so this is a no-op for them.
     override func animateOneFrame() {
@@ -44,6 +46,52 @@ final class LucidWallpaperSaverView: ScreenSaverView {
         playerLayer?.frame = bounds
         webView?.frame = bounds
         shader?.resize(to: bounds.size, scale: window?.backingScaleFactor ?? 2)
+    }
+
+    // MARK: Interactivity (mouse → interactive wallpapers)
+
+    /// Accept key/mouse events so interactive (web / shader) wallpapers react to the cursor,
+    /// exactly as they do on the live desktop.
+    override var acceptsFirstResponder: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.makeFirstResponder(self)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas { removeTrackingArea(area) }
+        let area = NSTrackingArea(rect: bounds,
+                                  options: [.mouseMoved, .activeAlways, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        deliverMouse(event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        deliverMouse(event)
+    }
+
+    /// Normalize the cursor to 0...1 (bottom-left origin, matching the app's renderers) and
+    /// hand it to whichever interactive renderer is active.
+    private func deliverMouse(_ event: NSEvent) {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        let nx = max(0, min(1, p.x / bounds.width))
+        let ny = max(0, min(1, p.y / bounds.height))
+        shader?.setMouse(x: Float(nx), y: Float(ny))
+        feedMouseToWeb(nx: nx, ny: ny)
+    }
+
+    /// Drive the shared cursor bridge (WebWallpaperRuntime.mouseBridgeShim) - the same pointer +
+    /// mouse event synthesis the app uses on the desktop, so interactive wallpapers react alike.
+    private func feedMouseToWeb(nx: CGFloat, ny: CGFloat) {
+        webView?.evaluateJavaScript(
+            "if(window.__lucidwallpaperMouse){window.__lucidwallpaperMouse(\(nx),\(ny));}", completionHandler: nil)
     }
 
     // MARK: Content
@@ -59,9 +107,34 @@ final class LucidWallpaperSaverView: ScreenSaverView {
             setupShader(item.url)
         case "web":
             setupWeb(item.url, isFile: item.url.isFileURL)
+        case "gif":
+            setupGIF(item.url)
+        case "slideshow":
+            setupSlideshow(item.url)
         default:
             break
         }
+    }
+
+    /// Animated GIF via an NSImageView (CALayer.contents wouldn't animate it).
+    private func setupGIF(_ url: URL) {
+        guard let image = NSImage(contentsOf: url) else { return }
+        let view = NSImageView(frame: bounds)
+        view.image = image
+        view.animates = true
+        view.imageScaling = .scaleProportionallyUpOrDown
+        view.autoresizingMask = [.width, .height]
+        addSubview(view)
+    }
+
+    /// A photo-folder slideshow: the saver shows the first image (static) instead of a black screen.
+    private func setupSlideshow(_ folder: URL) {
+        let exts: Set<String> = ["png", "jpg", "jpeg", "heic", "heif", "tiff", "tif", "bmp", "webp", "gif"]
+        let first = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))?
+            .filter { exts.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            .first
+        if let first { setupImage(first) }
     }
 
     private func setupVideo(_ url: URL) {
@@ -96,15 +169,20 @@ final class LucidWallpaperSaverView: ScreenSaverView {
     }
 
     private func setupWeb(_ url: URL, isFile: Bool) {
-        let web = WKWebView(frame: bounds)
+        // Same runtime as the desktop: package scheme + locale/geolocation/cursor shims.
+        let config = WebWallpaperRuntime.makeConfiguration(includeFPSCap: false)
+        let web = WKWebView(frame: bounds, configuration: config)
         web.autoresizingMask = [.width, .height]
-        if isFile {
-            web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        } else {
-            web.load(URLRequest(url: url))
-        }
+        WebWallpaperRuntime.load(url, in: web)
         addSubview(web)
         webView = web
+        // Feed time / theme / weather / now-playing / system stats so dynamic web wallpapers
+        // behave exactly as on the live desktop. Only web wallpapers consume these, and we skip
+        // it entirely in the tiny System Settings preview pane (no network / telemetry there).
+        guard !isPreview else { return }
+        let f = SaverFeeds(webView: web)
+        feeds = f
+        f.start()
     }
 
     // MARK: Shared library
@@ -135,6 +213,10 @@ private final class SaverShader {
     private var queue: MTLCommandQueue?
     private var pipeline: MTLRenderPipelineState?
     private let startTime = CACurrentMediaTime()
+    /// Cursor position (normalized, 0...1), updated by the saver view's mouse tracking.
+    private var mouse = SIMD2<Float>(0.5, 0.5)
+
+    func setMouse(x: Float, y: Float) { mouse = SIMD2<Float>(x, y) }
 
     private struct Uniforms { var res: SIMD2<Float>; var time: Float; var mouse: SIMD2<Float> }
 
@@ -169,7 +251,7 @@ private final class SaverShader {
         guard let pipeline, let queue, let drawable = metalLayer.nextDrawable() else { return }
         var u = Uniforms(res: SIMD2(Float(metalLayer.drawableSize.width), Float(metalLayer.drawableSize.height)),
                          time: Float(CACurrentMediaTime() - startTime),
-                         mouse: SIMD2(0.5, 0.5))
+                         mouse: mouse)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
         pass.colorAttachments[0].loadAction = .clear

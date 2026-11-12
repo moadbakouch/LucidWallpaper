@@ -32,30 +32,23 @@ struct GeneralView: View {
     @EnvironmentObject private var model: AppModel
     @State private var saverStatus: String?
     @State private var screenChange = 0   // bumped on display hot-plug to refresh display rows
-    @State private var category: SettingsCategory? =
-        SettingsCategory(rawValue: ProcessInfo.processInfo.environment["LUCIDWALL_SETTINGS_CAT"] ?? "") ?? .general
+    /// Which settings category to show (the sidebar selects it).
+    let category: SettingsCategory
 
     var body: some View {
-        NavigationSplitView {
-            List(SettingsCategory.allCases, id: \.self, selection: $category) { cat in
-                Label(cat.title, systemImage: cat.icon)
+        Form { categoryContent }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)   // let the window glass show through
+            .navigationTitle(category.title)
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+                screenChange += 1   // re-read NSScreen.screens on hot-plug
             }
-            .navigationSplitViewColumnWidth(min: 172, ideal: 190, max: 220)
-        } detail: {
-            Form { categoryContent }
-                .formStyle(.grouped)
-                .navigationTitle((category ?? .general).title)
-        }
-        .navigationSplitViewStyle(.balanced)
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
-            screenChange += 1   // a @State change re-evaluates body, re-reading NSScreen.screens
-        }
     }
 
     @ViewBuilder private var categoryContent: some View {
-        switch category ?? .general {
+        switch category {
         case .general:
-            currentSection; appearanceSection; profilesSection; shortcutsSection; startupSection; aboutSection
+            currentSection; appearanceSection; menuBarSection; profilesSection; shortcutsSection; desktopGestureSection; startupSection; aboutSection
         case .playback:
             playlistSection; scheduleSection
         case .displays:
@@ -87,10 +80,6 @@ struct GeneralView: View {
                 Button("Open Screen Saver Settings") { SaverInstaller.openScreenSaverSettings() }
             }
             if let saverStatus { Text(saverStatus).font(.footnote).foregroundStyle(.secondary) }
-            Text("Runs your live wallpaper as a screen saver. After installing, choose "
-                 + "“LucidWallpaperSaver” in System Settings → Screen Saver. macOS may ask you to "
-                 + "approve it the first time - that’s expected for a locally-built app.")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -108,15 +97,6 @@ struct GeneralView: View {
 
     private var permissionsSection: some View {
         Section("Permissions") {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "checkmark.shield.fill").foregroundStyle(.green)
-                Text("Wallpapers - including mouse-reactive ones - need no special permission. "
-                     + "LucidWallpaper doesn’t use Accessibility, Input Monitoring, or Screen Recording.")
-                    .font(.callout)
-            }
-            Text("The only approval macOS asks for is the screen saver (above). "
-                 + "You can review anything granted in Privacy & Security.")
-                .font(.footnote).foregroundStyle(.secondary)
             Button("Open Privacy & Security Settings") {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension")
                     ?? URL(string: "x-apple.systempreferences:com.apple.preference.security") {
@@ -153,16 +133,41 @@ struct GeneralView: View {
         Section("Appearance") {
             if model.liquidGlassSupported {
                 Toggle("Liquid Glass", isOn: $model.liquidGlassEnabled)
-                Text("Use macOS 26’s translucent Liquid Glass material for the desktop widgets, the command palette, and setup panels.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                if model.liquidGlassEnabled { glassPreview }
             } else {
                 HStack {
                     Text("Liquid Glass")
                     Spacer()
                     Text("Requires macOS 26").foregroundStyle(.secondary)
                 }
-                Text("This Mac uses the standard translucent material. Update to macOS 26 (Tahoe) for the Liquid Glass theme.")
-                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// Live sample of the Liquid Glass material over a colorful backdrop, so toggling it shows the
+    /// real effect right here (it's also used on the desktop widgets, command palette, and setup).
+    private var glassPreview: some View {
+        ZStack {
+            LinearGradient(colors: [.pink, .purple, .blue, .teal],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            Label("Liquid Glass", systemImage: "sparkles")
+                .font(.headline)
+                .glassSample()
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 120)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 10, trailing: 12))
+    }
+
+    // MARK: Menu Bar
+
+    private var menuBarSection: some View {
+        Section("Menu Bar") {
+            MenuBarColorPicker(item: nil)   // global default — applies to every wallpaper
+            VStack(alignment: .leading, spacing: 4) {
+                HStack { Text("Legibility scrim"); Spacer(); Text("\(Int(model.menuBarScrim * 100))%").foregroundStyle(.secondary) }
+                Slider(value: $model.menuBarScrim, in: 0...0.6)
             }
         }
     }
@@ -196,8 +201,6 @@ struct GeneralView: View {
             Menu {
                 ForEach(model.items) { item in Button(item.title) { model.addToPlaylist(item) } }
             } label: { Label("Add to Playlist", systemImage: "plus") }
-            Text("An ordered playlist plays each wallpaper for its own duration. Empty = rotate the whole library on the interval above.")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -217,8 +220,6 @@ struct GeneralView: View {
             if model.scheduleMode != "off" {
                 WallpaperPicker(title: "Day / Light", selection: $model.dayWallpaperID)
                 WallpaperPicker(title: "Night / Dark", selection: $model.nightWallpaperID)
-                Text("Switches with a crossfade. (Focus-mode switching isn’t available - macOS has no public API for it.)")
-                    .font(.footnote).foregroundStyle(.secondary)
             }
         }
     }
@@ -230,8 +231,6 @@ struct GeneralView: View {
             MonitorLayoutView()
             if PerSpaceController.isSupported {
                 Toggle("Different wallpaper per Space", isOn: $model.perSpaceEnabled)
-                Text("Remembers a wallpaper for each Mission Control Space and restores it as you switch.")
-                    .font(.footnote).foregroundStyle(.secondary)
             }
         }
     }
@@ -251,9 +250,6 @@ struct GeneralView: View {
                 }
             }
             Button { saveProfile() } label: { Label("Save current setup as a profile…", systemImage: "plus") }
-            Text("Save a whole setup - monitor mode, the wallpaper, and per-display picks - and switch "
-                 + "between them (e.g. Work / Gaming / Focus).")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -274,23 +270,23 @@ struct GeneralView: View {
 
     private var energySection: some View {
         Section("Energy") {
-            Picker("Wallpaper frame rate", selection: $model.wallpaperFrameRate) {
+            Picker(AppModel.supportsHighRefresh ? "Frame rate (plugged in)" : "Wallpaper frame rate",
+                   selection: $model.wallpaperFrameRate) {
                 Text("30 fps (recommended)").tag(30)
                 Text("45 fps").tag(45)
                 Text("60 fps").tag(60)
+                if AppModel.supportsHighRefresh {
+                    Text("120 fps (ProMotion)").tag(120)
+                }
             }
             Toggle("Pause on battery", isOn: $model.pauseOnBattery)
             Toggle("Pause in Low Power Mode", isOn: $model.pauseOnLowPowerMode)
-            Picker("Extra limit on battery", selection: $model.frameRateCapOnBattery) {
+            Picker("On battery, cap at", selection: $model.frameRateCapOnBattery) {
                 Text("Off").tag(0)
+                Text("60 fps").tag(60)
                 Text("30 fps").tag(30)
                 Text("15 fps").tag(15)
             }
-            Text("A lower frame rate is the biggest power saver for animated (shader / web) "
-                 + "wallpapers - 30 fps roughly halves GPU work versus 60. Wallpapers also pause "
-                 + "automatically when covered by a maximized or fullscreen app (per display) and "
-                 + "when the screen locks or sleeps. Video is hardware-decoded for low CPU.")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -308,10 +304,6 @@ struct GeneralView: View {
             if model.pauseWhenIdle {
                 Stepper("After \(model.idleMinutes) min idle", value: $model.idleMinutes, in: 1...60)
             }
-            Text("Dim a distracting wallpaper (toggle with ⌃⌥⌘D). Reduce Motion freezes wallpapers "
-                 + "to a still frame. Video calls pause via known conferencing apps (Zoom, Teams, "
-                 + "FaceTime, Webex).")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -321,9 +313,6 @@ struct GeneralView: View {
         Section("Dynamic & Reactive") {
             Toggle("Weather & time-of-day effects", isOn: $model.weatherEffectsEnabled)
             Toggle("Parallax nudge on Space switch", isOn: $model.spaceParallaxEnabled)
-            Text("Feeds web wallpapers your local weather (no location permission - derived from your "
-                 + "IP) plus the system accent color and light/dark. Try the “Dynamic Sky” wallpaper.")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -343,8 +332,6 @@ struct GeneralView: View {
                 }
             }
             Button { addApp() } label: { Label("Add App…", systemImage: "plus") }
-            Text("Wallpapers pause while one of these apps is frontmost - handy for games or heavy work.")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -367,8 +354,7 @@ struct GeneralView: View {
                 HStack { Text("Master volume"); Spacer(); Text("\(Int(model.audioVolume * 100))%").foregroundStyle(.secondary) }
                 Slider(value: $model.audioVolume, in: 0...1)
             }
-            Text("Assign a looping sound to any wallpaper from its panel in the Videos / Interactive tabs. Muted by default.")
-                .font(.footnote).foregroundStyle(.secondary)
+            Toggle("Duck when other audio plays", isOn: $model.duckOtherAudio)
         }
     }
 
@@ -378,8 +364,6 @@ struct GeneralView: View {
         Section("System Widgets") {
             Toggle("Send system stats (CPU / RAM / network)", isOn: $model.systemInfoEnabled)
             Toggle("Send now-playing track", isOn: $model.nowPlayingEnabled)
-            Text("For web wallpapers using livelySystemInformation / livelyCurrentTrack.")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -388,9 +372,38 @@ struct GeneralView: View {
     private var shortcutsSection: some View {
         Section("Shortcuts") {
             Toggle("Global hotkeys", isOn: $model.globalHotkeysEnabled)
-            Text("⌃⌥⌘Space quick switch · ⌃⌥⌘P pause · ⌃⌥⌘] next · ⌃⌥⌘[ previous · ⌃⌥⌘R random · ⌃⌥⌘D dim. "
-                 + "Works system-wide; no permission needed.")
-                .font(.footnote).foregroundStyle(.secondary)
+            if model.globalHotkeysEnabled {
+                ForEach(HotkeyAction.allCases) { action in
+                    ShortcutRecorderRow(action: action)
+                }
+            }
+        }
+    }
+
+    // MARK: Desktop gestures
+
+    private var desktopGestureSection: some View {
+        Section("Desktop") {
+            Picker("⌥ Double-click empty desktop", selection: $model.desktopGesture) {
+                Text("Do Nothing").tag("off")
+                Text("Play / Pause Wallpaper").tag("playPause")
+                Text("Hide / Show Desktop Icons").tag("hideIcons")
+            }
+            if model.desktopGesture != "off" && !model.hasInputMonitoring {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+                    Text("Desktop gestures need Input Monitoring permission to detect the double-click.")
+                        .font(.footnote)
+                    Spacer()
+                    Button("Open Settings") { openInputMonitoring() }
+                }
+            }
+        }
+    }
+
+    private func openInputMonitoring() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+            NSWorkspace.shared.open(url)
         }
     }
 
@@ -401,25 +414,18 @@ struct GeneralView: View {
             Button { model.checkForUpdates() } label: { Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath") }
             Toggle("Check for updates automatically", isOn: $model.autoCheckUpdates)
             Toggle("Sync settings via iCloud", isOn: $model.iCloudSyncEnabled)
-            Text("iCloud syncs your preferences (not the wallpaper files) across your Macs - active in "
-                 + "signed builds with the iCloud capability. Automatic updates use a published appcast.")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
     private var startupSection: some View {
         Section("Startup") {
             Toggle("Launch at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.launchAtLogin = $0 }))
-            Text("Get more wallpapers any time from the Store tab.")
-                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
     private var aboutSection: some View {
         Section("About") {
             Button { model.requestFeedback?() } label: { Label("Send Feedback…", systemImage: "envelope") }
-            Text("Found a bug or have an idea? We'd love to hear it.")
-                .font(.footnote).foregroundStyle(.secondary)
             Text("LucidWallpaper \(appVersion)").font(.footnote).foregroundStyle(.secondary)
         }
     }
@@ -428,6 +434,155 @@ struct GeneralView: View {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         return "v\(v)"
     }
+}
+
+/// A single recordable hotkey row: shows the current chord, and on click captures the next
+/// key combination (via a local NSEvent monitor) and saves it as the action's binding.
+struct ShortcutRecorderRow: View {
+    @EnvironmentObject private var model: AppModel
+    let action: HotkeyAction
+    @State private var recording = false
+    @State private var monitor: Any?
+    @State private var refresh = 0   // bump to re-read the persisted display string
+
+    var body: some View {
+        HStack {
+            Text(action.title)
+            if !recording && model.hotKeys.isConflicted(action) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.yellow)
+                    .help("This shortcut is already used by another app and didn't bind. Pick a different combination.")
+            }
+            Spacer()
+            Button(action: toggle) {
+                Text(recording ? "Press keys…" : HotkeyStore.displayString(for: action))
+                    .font(.system(.body, design: .monospaced))
+                    .frame(minWidth: 64)
+            }
+            .buttonStyle(.bordered)
+            .tint(recording ? .accentColor : nil)
+            if HotkeyStore.isCustom(action) && !recording {
+                Button { reset() } label: { Image(systemName: "arrow.uturn.backward") }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .help("Reset to default")
+            }
+        }
+        .id(refresh)
+        .onDisappear { if recording { cancel() } }
+    }
+
+    private func toggle() { recording ? cancel() : begin() }
+
+    private func begin() {
+        recording = true
+        model.suspendHotkeys()   // don't let a stored chord fire while we capture a new one
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            handle(event)
+            return nil   // swallow so the keystroke doesn't leak into the UI
+        }
+    }
+
+    private func handle(_ event: NSEvent) {
+        if event.keyCode == HotkeyStore.escapeKeyCode { cancel(); return }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        // Require at least one of ⌃ / ⌥ / ⌘ so a global hotkey can't swallow plain typing.
+        guard flags.contains(.control) || flags.contains(.option) || flags.contains(.command) else { return }
+        let cfg = HotkeyConfiguration(keyCode: UInt32(event.keyCode),
+                                      modifiers: HotkeyStore.carbonModifiers(from: flags))
+        HotkeyStore.setConfig(cfg, for: action)
+        finish()
+    }
+
+    private func reset() {
+        HotkeyStore.reset(action)
+        model.reloadHotkeys()
+        refresh += 1
+    }
+
+    private func cancel() { finish() }
+
+    private func finish() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        recording = false
+        model.reloadHotkeys()   // re-arm global hotkeys with the (possibly new) bindings
+        refresh += 1
+    }
+}
+
+/// One searchable setting for the Settings topic search: a title, the category it lives in, and
+/// keywords/synonyms so a concept search ("battery", "dark mode", "mouse") finds it.
+struct SettingsEntry: Identifiable {
+    let title: String
+    let category: SettingsCategory
+    let keywords: [String]
+    var id: String { title }
+    var haystack: String { (title + " " + category.title + " " + keywords.joined(separator: " ")).lowercased() }
+
+    static let all: [SettingsEntry] = [
+        SettingsEntry(title: "Current Wallpaper / Pause / Next / Random", category: .general,
+                      keywords: ["pause", "resume", "next", "previous", "random", "cycle", "remove"]),
+        SettingsEntry(title: "Liquid Glass theme", category: .general,
+                      keywords: ["glass", "theme", "appearance", "translucent", "material", "macos 26", "tahoe"]),
+        SettingsEntry(title: "Menu Bar Color", category: .general,
+                      keywords: ["menu bar", "menubar", "color", "tint", "eyedropper", "auto", "custom"]),
+        SettingsEntry(title: "Menu Bar Legibility Scrim", category: .general,
+                      keywords: ["scrim", "menu bar", "darken", "legibility", "readable"]),
+        SettingsEntry(title: "Profiles (Scenes)", category: .general,
+                      keywords: ["profile", "scene", "work", "gaming", "focus", "setup", "preset"]),
+        SettingsEntry(title: "Global Hotkeys / Shortcuts", category: .general,
+                      keywords: ["shortcut", "hotkey", "keyboard", "key", "pause key", "quick switch", "record"]),
+        SettingsEntry(title: "Desktop Gestures", category: .general,
+                      keywords: ["gesture", "double click", "double-click", "desktop", "hide icons", "play pause"]),
+        SettingsEntry(title: "Launch at Login", category: .general,
+                      keywords: ["startup", "login", "launch", "autostart", "boot", "open at login"]),
+        SettingsEntry(title: "Send Feedback", category: .general,
+                      keywords: ["feedback", "bug", "report", "contact", "support", "idea"]),
+        SettingsEntry(title: "Rotation & Playlist", category: .playback,
+                      keywords: ["rotation", "rotate", "playlist", "shuffle", "interval", "auto rotate", "slideshow"]),
+        SettingsEntry(title: "Schedule (Day / Night)", category: .playback,
+                      keywords: ["schedule", "day", "night", "time of day", "appearance", "light", "dark", "dark mode", "sunrise", "sunset"]),
+        SettingsEntry(title: "Monitor Layout & Mode", category: .displays,
+                      keywords: ["monitor", "display", "multi", "mirror", "span", "independent", "arrangement", "screen", "external"]),
+        SettingsEntry(title: "Different Wallpaper per Space", category: .displays,
+                      keywords: ["space", "spaces", "mission control", "per space", "desktop"]),
+        SettingsEntry(title: "Wallpaper Frame Rate", category: .energy,
+                      keywords: ["fps", "frame rate", "framerate", "performance", "energy", "smooth", "30", "60"]),
+        SettingsEntry(title: "Pause on Battery", category: .energy,
+                      keywords: ["battery", "power", "energy", "unplugged", "laptop"]),
+        SettingsEntry(title: "Pause in Low Power Mode", category: .energy,
+                      keywords: ["low power", "battery", "energy saver"]),
+        SettingsEntry(title: "Dim Wallpaper", category: .energy,
+                      keywords: ["dim", "darken", "brightness", "distraction"]),
+        SettingsEntry(title: "Respect Reduce Motion", category: .energy,
+                      keywords: ["reduce motion", "accessibility", "motion", "still", "freeze"]),
+        SettingsEntry(title: "Pause During Video Calls", category: .energy,
+                      keywords: ["meeting", "call", "zoom", "teams", "facetime", "webex", "video call", "camera", "mic"]),
+        SettingsEntry(title: "Pause When Idle", category: .energy,
+                      keywords: ["idle", "away", "inactivity", "afk"]),
+        SettingsEntry(title: "Pause for Apps", category: .energy,
+                      keywords: ["app", "game", "frontmost", "pause for", "fullscreen app"]),
+        SettingsEntry(title: "Weather & Time-of-Day Effects", category: .effects,
+                      keywords: ["weather", "time", "dynamic", "environment", "rain", "snow", "sky", "temperature"]),
+        SettingsEntry(title: "Parallax Nudge on Space Switch", category: .effects,
+                      keywords: ["parallax", "space switch", "nudge", "motion"]),
+        SettingsEntry(title: "Ambient Sound", category: .effects,
+                      keywords: ["sound", "audio", "volume", "ambient", "rain", "ocean", "noise", "mute"]),
+        SettingsEntry(title: "Duck When Other Audio Plays", category: .effects,
+                      keywords: ["duck", "ducking", "audio", "music", "spotify", "lower volume"]),
+        SettingsEntry(title: "Desktop Widgets (Clock / Date / Weather)", category: .effects,
+                      keywords: ["widget", "clock", "date", "overlay", "now playing", "weather widget"]),
+        SettingsEntry(title: "System Stats & Now-Playing Feed", category: .effects,
+                      keywords: ["cpu", "ram", "gpu", "stats", "system info", "now playing", "track", "network"]),
+        SettingsEntry(title: "Screen Saver", category: .advanced,
+                      keywords: ["screensaver", "screen saver", "saver", "install", "lock screen"]),
+        SettingsEntry(title: "Permissions", category: .advanced,
+                      keywords: ["permission", "privacy", "accessibility", "input monitoring", "screen recording"]),
+        SettingsEntry(title: "Check for Updates", category: .advanced,
+                      keywords: ["update", "updates", "version", "appcast", "upgrade"]),
+        SettingsEntry(title: "iCloud Settings Sync", category: .advanced,
+                      keywords: ["icloud", "sync", "settings sync", "cloud", "backup"]),
+    ]
 }
 
 /// Picks a wallpaper from the library (or None) by id.

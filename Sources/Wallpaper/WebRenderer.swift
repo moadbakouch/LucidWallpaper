@@ -14,15 +14,15 @@ final class WebRenderer: NSObject, WallpaperRenderer {
     private var pendingValues: [String: LivelyValue] = [:]
     private var isLoaded = false
     private var frameRateCap = 0
+    /// folderDropdown property name → its folder, so values go out as "folder/file" like Lively.
+    private var folderProperties: [String: String] = [:]
+    private var crashCount = 0
+    private var lastCrash = Date.distantPast
 
     override init() {
-        let config = WKWebViewConfiguration()
-        config.suppressesIncrementalRendering = false
-        // Inject the rAF throttle shim before any page script runs (energy saving).
-        let shim = WKUserScript(source: Self.fpsCapShim,
-                                injectionTime: .atDocumentStart,
-                                forMainFrameOnly: true)
-        config.userContentController.addUserScript(shim)
+        // Package scheme + Mac compatibility shims (locale, geolocation, cursor bridge, rAF
+        // throttle/pause) - see WebWallpaperRuntime.
+        let config = WebWallpaperRuntime.makeConfiguration()
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
 
@@ -35,18 +35,17 @@ final class WebRenderer: NSObject, WallpaperRenderer {
 
     func load(_ item: WallpaperItem) {
         isLoaded = false
-        let url = item.contentURL
-        if url.isFileURL {
-            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        } else {
-            webView.load(URLRequest(url: url))
-        }
+        folderProperties = LivelyPropertySchema.folders(item.propertiesURL)
+        WebWallpaperRuntime.load(item.contentURL, in: webView)
     }
 
     func play() {
-        // Resume the rAF loop (hard stop, below) and notify Lively-aware wallpapers.
+        // Resume the rAF loop (hard stop, below) and notify Lively-aware wallpapers. Also re-arm the
+        // mouse bridge so an interactive wallpaper that needs a pressed pointer reacts again after a
+        // pause/resume (the next cursor move re-presses).
         evaluate("if(window.__lucidwallpaperPause){window.__lucidwallpaperPause(false);}"
-               + "if(window.livelyWallpaperPlaybackChanged){window.livelyWallpaperPlaybackChanged(false);}")
+               + "if(window.livelyWallpaperPlaybackChanged){window.livelyWallpaperPlaybackChanged(false);}"
+               + "if(window.__lucidwallpaperResetMouse){window.__lucidwallpaperResetMouse();}")
     }
 
     func pause() {
@@ -64,17 +63,10 @@ final class WebRenderer: NSObject, WallpaperRenderer {
     }
 
     func updateMouse(normalized point: CGPoint) {
-        // DOM mousemove at pixel coords (top-left origin) so unmodified Lively wallpapers
-        // using addEventListener('mousemove', …) react.
-        let js = """
-        (function(){
-          var x = \(point.x) * window.innerWidth;
-          var y = (1 - \(point.y)) * window.innerHeight;
-          document.dispatchEvent(new MouseEvent('mousemove', {clientX:x, clientY:y, bubbles:true}));
-          if (window.livelyMousePos) { window.livelyMousePos(x, y); }
-        })();
-        """
-        evaluate(js)
+        // Drive the cursor bridge (injected at document start). It dispatches pointer + mouse events
+        // on the element under the cursor with a held-button state, so wallpapers that listen on the
+        // canvas and/or require a pressed pointer (fluid sims) react - not just `mousemove` ones.
+        evaluate("if(window.__lucidwallpaperMouse){window.__lucidwallpaperMouse(\(point.x),\(point.y));}")
     }
 
     func setProperties(_ values: [String: LivelyValue]) {
@@ -85,7 +77,7 @@ final class WebRenderer: NSObject, WallpaperRenderer {
     func setProperty(_ name: String, value: LivelyValue) {
         pendingValues[name] = value
         guard isLoaded else { return }
-        evaluate(Self.listenerCall(name: name, value: value))
+        evaluate(Self.listenerCall(name: name, value: LivelyPropertySchema.pageValue(value, folder: folderProperties[name])))
     }
 
     // MARK: Bridge
@@ -94,7 +86,7 @@ final class WebRenderer: NSObject, WallpaperRenderer {
         guard !pendingValues.isEmpty else { return }
         var js = "if(window.livelyPropertyListener){"
         for (name, value) in pendingValues {
-            js += Self.listenerCall(name: name, value: value)
+            js += Self.listenerCall(name: name, value: LivelyPropertySchema.pageValue(value, folder: folderProperties[name]))
         }
         js += "}"
         evaluate(js)
@@ -137,35 +129,6 @@ final class WebRenderer: NSObject, WallpaperRenderer {
         guard isLoaded else { return }
         evaluate("window.lucidEnvironment=\(json);if(window.livelyEnvironment){window.livelyEnvironment(\(json));}")
     }
-
-    /// Wraps requestAnimationFrame so the wallpaper can be (a) throttled to a target FPS and
-    /// (b) hard-frozen while paused. When paused we hold pending callbacks instead of
-    /// scheduling them, which stalls the animation loop and drops CPU/GPU to zero; resuming
-    /// replays the held callbacks to restart it.
-    private static let fpsCapShim = """
-    (function(){
-      var cap = 0, last = 0, paused = false, held = [];
-      var raf = window.requestAnimationFrame
-        ? window.requestAnimationFrame.bind(window)
-        : function(cb){ return setTimeout(function(){ cb(performance.now()); }, 16); };
-      window.requestAnimationFrame = function(cb){
-        if (paused) { held.push(cb); return 0; }
-        if (cap <= 0) { return raf(cb); }
-        var interval = 1000 / cap;
-        return raf(function(t){
-          if (t - last >= interval - 0.5) { last = t; cb(t); }
-          else { window.requestAnimationFrame(cb); }
-        });
-      };
-      window.__lucidwallpaperSetFPSCap = function(n){ cap = n || 0; };
-      window.__lucidwallpaperPause = function(p){
-        p = !!p;
-        if (p === paused) { return; }
-        paused = p;
-        if (!paused) { var q = held; held = []; q.forEach(function(cb){ window.requestAnimationFrame(cb); }); }
-      };
-    })();
-    """
 }
 
 extension WebRenderer: WKNavigationDelegate {
@@ -173,5 +136,24 @@ extension WebRenderer: WKNavigationDelegate {
         isLoaded = true
         applyAllProperties()
         if frameRateCap > 0 { setFrameRateCap(frameRateCap) }
+        // The page (and its canvas/listeners) is ready now - let the next cursor move re-press so
+        // interactive wallpapers react without needing a real click first.
+        evaluate("if(window.__lucidwallpaperResetMouse){window.__lucidwallpaperResetMouse();}")
+    }
+
+    /// WebKit kills the page's content process under memory pressure or on a GPU fault (heavy
+    /// WebGL wallpapers). Without this the desktop would stay blank until the next switch, so
+    /// reload - but give up after a few crashes in a row rather than loop on a broken page.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        isLoaded = false
+        let now = Date()
+        if now.timeIntervalSince(lastCrash) > 60 { crashCount = 0 }
+        lastCrash = now
+        crashCount += 1
+        guard crashCount <= 3 else {
+            NSLog("LucidWallpaper: web wallpaper keeps crashing; not reloading")
+            return
+        }
+        webView.reload()
     }
 }

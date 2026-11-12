@@ -85,6 +85,15 @@ enum BuiltInWallpapers {
         }
     }
 
+    /// A file inside Contents/Resources/BundledWallpapers (e.g. the Creator engine), if present.
+    static func resourceURL(_ relativePath: String) -> URL? {
+        guard let url = Bundle.main.resourceURL?
+            .appendingPathComponent("BundledWallpapers", isDirectory: true)
+            .appendingPathComponent(relativePath),
+              FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return url
+    }
+
     /// The wallpaper applied by default the very first time the app runs.
     static let defaultID = uuid("B0000013")   // Aurora
 

@@ -26,6 +26,18 @@ struct WallpaperItem: Identifiable, Codable, Hashable {
     var arguments: String?
     var propertiesURL: URL?   // LivelyProperties.json, if the package ships one
 
+    /// Provenance for Store downloads: the catalog item's id (its download URL). Lets the Store
+    /// show a persistent "In Library" state by matching against what's already imported.
+    var sourceID: String?
+
+    /// When the wallpaper was added to the library (stamped by `LibraryStore.add`). Optional so
+    /// libraries saved before this field existed still decode (they sort as oldest).
+    var dateAdded: Date?
+
+    /// Store catalog category ("Clock"/"Audio"/"System"…), stamped on download. Used to split the
+    /// library into Interactive vs Widgets. Optional, so older libraries still decode.
+    var category: String?
+
     init(id: UUID = UUID(),
          title: String,
          kind: WallpaperKind,
@@ -34,7 +46,10 @@ struct WallpaperItem: Identifiable, Codable, Hashable {
          author: String? = nil,
          desc: String? = nil,
          arguments: String? = nil,
-         propertiesURL: URL? = nil) {
+         propertiesURL: URL? = nil,
+         sourceID: String? = nil,
+         dateAdded: Date? = nil,
+         category: String? = nil) {
         self.id = id
         self.title = title
         self.kind = kind
@@ -44,6 +59,27 @@ struct WallpaperItem: Identifiable, Codable, Hashable {
         self.desc = desc
         self.arguments = arguments
         self.propertiesURL = propertiesURL
+        self.sourceID = sourceID
+        self.dateAdded = dateAdded
+        self.category = category
+    }
+
+    /// Categories whose wallpapers are treated as "widgets" (clock / audio visualizer / system
+    /// monitor) rather than full interactive scenes.
+    static let widgetCategories: Set<String> = ["Clock", "Audio", "System"]
+    private static let widgetKeywords = ["clock", "time", "watch", "calendar", "visualizer",
+        "visualiser", "spectrum", "equalizer", "audio", "cpu", "gpu", "ram", "memory", "stats",
+        "monitor", "system", "weather", "battery", "countdown", "timer"]
+
+    /// Whether this wallpaper is widget-style (so it lands in the Widgets section, not Interactive).
+    /// Only web/shader wallpapers can be widgets; classified by Store category, else by keywords.
+    var isWidgetStyle: Bool {
+        guard kind == .web || kind == .shader else { return false }
+        if let category, WallpaperItem.widgetCategories.contains(category) { return true }
+        // Title-only keyword match: descriptions like "audio-reactive fluid" would otherwise drag
+        // non-widget scenes (Fluids) into Widgets.
+        let hay = title.lowercased()
+        return WallpaperItem.widgetKeywords.contains { hay.contains($0) }
     }
 
     /// A built-in animated wallpaper for verifying the desktop-level window without a media file.

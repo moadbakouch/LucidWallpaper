@@ -49,7 +49,7 @@ enum LivelyImporter {
     private static func importLively(from packageRoot: URL) throws -> WallpaperItem {
         let fm = FileManager.default
         let manifestURL = packageRoot.appendingPathComponent("LivelyInfo.json")
-        let info = try JSONDecoder().decode(LivelyInfo.self, from: Data(contentsOf: manifestURL))
+        let info = try LivelyJSON.decode(LivelyInfo.self, from: Data(contentsOf: manifestURL))
 
         guard let entryName = info.fileName, !entryName.isEmpty else {
             throw ImportError.missingEntryFile("(unspecified)")

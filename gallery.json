@@ -1,0 +1,725 @@
+[
+  {
+    "title": "Rain",
+    "author": "rocksdanister",
+    "download": "https://github.com/rocksdanister/rain/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/rocksdanister/rain/master/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/rocksdanister/rain/master/thumbnail.jpg"
+  },
+  {
+    "title": "Snow",
+    "author": "rocksdanister",
+    "download": "https://github.com/rocksdanister/snow/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/rocksdanister/snow/master/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/rocksdanister/snow/master/thumbnail.jpg"
+  },
+  {
+    "title": "Forest",
+    "author": "Pabilo8",
+    "download": "https://github.com/Pabilo8/forest-wallpaper/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/Pabilo8/forest-wallpaper/master/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Pabilo8/forest-wallpaper/master/lively_t.jpg"
+  },
+  {
+    "title": "Rainy Window",
+    "author": "eduhdev12",
+    "download": "https://github.com/eduhdev12/rain-lively-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/eduhdev12/rain-lively-wallpaper/main/preview2.gif"
+  },
+  {
+    "title": "Koi Pond",
+    "author": "Rezaye Rabbi",
+    "download": "https://github.com/rzrabbi/interactive-koi-pond/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Interactive",
+    "preview": "https://raw.githubusercontent.com/rzrabbi/interactive-koi-pond/master/LivelyPreview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/rzrabbi/interactive-koi-pond/master/LivelyThumbnail.jpg"
+  },
+  {
+    "title": "Enchanted Cursor",
+    "author": "Anar Bastanov",
+    "download": "https://github.com/anar-bastanov/enchanted-cursor-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Interactive",
+    "preview": "https://raw.githubusercontent.com/anar-bastanov/enchanted-cursor-wallpaper/main/res/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/anar-bastanov/enchanted-cursor-wallpaper/main/res/thumbnail.png"
+  },
+  {
+    "title": "System Dials",
+    "author": "Natrome Tex",
+    "download": "https://github.com/NatromeTex/System-Dials/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/NatromeTex/System-Dials/master/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/NatromeTex/System-Dials/master/lplowirl.jpg"
+  },
+  {
+    "title": "Parallax",
+    "author": "OMEGA",
+    "download": "https://github.com/0ME9A/parallax-wallpaper/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/0ME9A/parallax-wallpaper/master/preview.png",
+    "thumbnail": "https://raw.githubusercontent.com/0ME9A/parallax-wallpaper/master/preview.png"
+  },
+  {
+    "title": "Gradient Ribbons",
+    "author": "Berk Ege",
+    "download": "https://github.com/brkeejp/lively-gradient-ribbons/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/brkeejp/lively-gradient-ribbons/master/1fvnskpb.rqc.gif",
+    "thumbnail": "https://raw.githubusercontent.com/brkeejp/lively-gradient-ribbons/master/f1xmy0lt.vsu.jpg"
+  },
+  {
+    "title": "Glowing Circles",
+    "author": "Benjamin Halko",
+    "download": "https://github.com/BenjaminHalko/win11-circles/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "thumbnail": "https://raw.githubusercontent.com/BenjaminHalko/win11-circles/main/preview.jpg"
+  },
+  {
+    "title": "In The Grid",
+    "author": "William Skipper",
+    "download": "https://github.com/WilliamSkipper/In-The-Grid/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "thumbnail": "https://raw.githubusercontent.com/WilliamSkipper/In-The-Grid/main/pack_icon.png"
+  },
+  {
+    "title": "Watch Face",
+    "author": "OMEGA",
+    "download": "https://github.com/0ME9A/watchFace/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Minimal",
+    "preview": "https://raw.githubusercontent.com/0ME9A/watchFace/master/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/0ME9A/watchFace/master/preview.png"
+  },
+  {
+    "title": "Minimalistic Desktop",
+    "author": "Astrogamer54",
+    "download": "https://github.com/MostOriginalIGN/minimalistic-desktop/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Minimal",
+    "preview": "https://raw.githubusercontent.com/MostOriginalIGN/minimalistic-desktop/master/minimalisticdesktop.gif",
+    "thumbnail": "https://raw.githubusercontent.com/MostOriginalIGN/minimalistic-desktop/master/minimalisticdesktop.png"
+  },
+  {
+    "title": "Alve's Town",
+    "author": "Gabrz",
+    "download": "https://github.com/Gabrz/lively-alve/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Scenic",
+    "preview": "https://raw.githubusercontent.com/Gabrz/lively-alve/master/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Gabrz/lively-alve/master/thumbnail.jpg"
+  },
+  {
+    "title": "Inquisition",
+    "author": "Gabrz",
+    "download": "https://github.com/Gabrz/lively-inquisition/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Scenic",
+    "preview": "https://raw.githubusercontent.com/Gabrz/lively-inquisition/master/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Gabrz/lively-inquisition/master/thumbnail.jpg"
+  },
+  {
+    "title": "Edgerunners Moon",
+    "author": "Manadra",
+    "download": "https://github.com/Manadrah/cyberpunk-edgerunners-moon-lively-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Anime",
+    "preview": "https://raw.githubusercontent.com/Manadrah/cyberpunk-edgerunners-moon-lively-wallpaper/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Manadrah/cyberpunk-edgerunners-moon-lively-wallpaper/main/thumbnail.png"
+  },
+  {
+    "title": "Inazuma Shrine",
+    "author": "MasterMach50",
+    "download": "https://github.com/mastermach50/Inazuma-Lively-Wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Anime",
+    "preview": "https://raw.githubusercontent.com/mastermach50/Inazuma-Lively-Wallpaper/main/thumbnail.jpg",
+    "thumbnail": "https://raw.githubusercontent.com/mastermach50/Inazuma-Lively-Wallpaper/main/thumbnail.jpg"
+  },
+  {
+    "title": "Alien Monster",
+    "author": "Virus24",
+    "download": "https://github.com/sabrydawood/lively-theme/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/sabrydawood/lively-theme/main/img/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/sabrydawood/lively-theme/main/img/thumbinail.jpg"
+  },
+  {
+    "title": "Bubbles",
+    "author": "Toomcis",
+    "download": "https://github.com/toomcis/Bubbles/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/toomcis/Bubbles/main/p.gif"
+  },
+  {
+    "title": "Elito's Cozy Place",
+    "author": "ElitoGame",
+    "download": "https://github.com/ElitoGame/TheOutpost-Wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "thumbnail": "https://raw.githubusercontent.com/ElitoGame/TheOutpost-Wallpaper/main/rsc/cozy_place.001.png"
+  },
+  {
+    "title": "Fluids",
+    "author": "PavelDoGreat",
+    "download": "https://github.com/JJPEOPLES/FluidV2-source-code/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/JJPEOPLES/FluidV2-source-code/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/JJPEOPLES/FluidV2-source-code/main/thumbnail.jpg"
+  },
+  {
+    "title": "Fluids v2 - PR1SM Edition",
+    "author": "PavelDoGreat, customized by okk",
+    "download": "https://github.com/prsm/pr1sm-live-wallpaper/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/prsm/pr1sm-live-wallpaper/master/fluid_preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/prsm/pr1sm-live-wallpaper/master/fluid.jpg"
+  },
+  {
+    "title": "Fractalizer",
+    "author": "Flufiku",
+    "download": "https://github.com/Flufiku/Fractalizer/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/Flufiku/Fractalizer/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Flufiku/Fractalizer/main/thumbnail.jpg"
+  },
+  {
+    "title": "Hababi",
+    "author": "Hababi",
+    "download": "https://github.com/GitHababi/Hababi-Lively-Wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/GitHababi/Hababi-Lively-Wallpaper/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/GitHababi/Hababi-Lively-Wallpaper/main/thumbnail.jpg"
+  },
+  {
+    "title": "Lively Dots",
+    "author": "Cyrus Yip",
+    "download": "https://github.com/RealCyGuy/lively-dots/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/RealCyGuy/lively-dots/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/RealCyGuy/lively-dots/main/preview.jpg"
+  },
+  {
+    "title": "LW 化学式",
+    "author": "Patrick Yao",
+    "download": "https://github.com/yaoychen/LW/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/yaoychen/LW/main/theme.png",
+    "thumbnail": "https://raw.githubusercontent.com/yaoychen/LW/main/theme.png"
+  },
+  {
+    "title": "Neon Hexagons",
+    "author": "Cyrus Yip",
+    "download": "https://github.com/RealCyGuy/neon-hexagon-forming-particles-LIVELY-WALLPAPER/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/RealCyGuy/neon-hexagon-forming-particles-LIVELY-WALLPAPER/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/RealCyGuy/neon-hexagon-forming-particles-LIVELY-WALLPAPER/main/preview.jpg"
+  },
+  {
+    "title": "Print Pattern",
+    "author": "Otto Zumkeller",
+    "download": "https://github.com/ottozumkeller/ten-print-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/ottozumkeller/ten-print-wallpaper/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/ottozumkeller/ten-print-wallpaper/main/thumbnail.jpg"
+  },
+  {
+    "title": "Neural Network",
+    "author": "hiicl",
+    "download": "https://github.com/hiicl/neural-network-Lively-Wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/hiicl/neural-network-Lively-Wallpaper/main/btdfnzdn.gif",
+    "thumbnail": "https://raw.githubusercontent.com/hiicl/neural-network-Lively-Wallpaper/main/on4tjway.jpg"
+  },
+  {
+    "title": "Nicole's Banner",
+    "author": "Manadra",
+    "download": "https://github.com/Manadrah/nicole-banner-lively-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Anime",
+    "preview": "https://raw.githubusercontent.com/Manadrah/nicole-banner-lively-wallpaper/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Manadrah/nicole-banner-lively-wallpaper/main/thumbnail.png"
+  },
+  {
+    "title": "Bongo Cat",
+    "author": "Chris Kim",
+    "download": "https://github.com/skysur4/lively-wallpaper-bongo.cat/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Audio",
+    "preview": "https://raw.githubusercontent.com/skysur4/lively-wallpaper-bongo.cat/master/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/skysur4/lively-wallpaper-bongo.cat/master/lively_t.png"
+  },
+  {
+    "title": "The Hill (Now Playing)",
+    "author": "Yoichi Kobayashi",
+    "download": "https://github.com/Mootbing/now-playing-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Audio",
+    "preview": "https://raw.githubusercontent.com/Mootbing/now-playing-wallpaper/main/ghpp4rbp.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Mootbing/now-playing-wallpaper/main/0badfnt2.jpg"
+  },
+  {
+    "title": "VinylDesk",
+    "author": "VinylDesk",
+    "download": "https://github.com/VisualizerDesk/VinylDesk-Lively-Music-Wallpaper-Beta-/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Audio",
+    "preview": "https://raw.githubusercontent.com/VisualizerDesk/VinylDesk-Lively-Music-Wallpaper-Beta-/main/1.png",
+    "thumbnail": "https://raw.githubusercontent.com/VisualizerDesk/VinylDesk-Lively-Music-Wallpaper-Beta-/main/1.png"
+  },
+  {
+    "title": "Clock",
+    "author": "TheWafool",
+    "download": "https://github.com/TheWafool/Clock/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "thumbnail": "https://raw.githubusercontent.com/TheWafool/Clock/main/2unlloee.jpg"
+  },
+  {
+    "title": "Fluids Clock",
+    "author": "PavelDoGreat",
+    "download": "https://github.com/robotism/lively-wallpaper-fluid-clock/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "preview": "https://raw.githubusercontent.com/robotism/lively-wallpaper-fluid-clock/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/robotism/lively-wallpaper-fluid-clock/main/thumbnail.jpg"
+  },
+  {
+    "title": "Steins;Gate Divergence Meter",
+    "author": "Pit!",
+    "download": "https://github.com/DenilsonRamirez/Divergence-Meter/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "thumbnail": "https://raw.githubusercontent.com/DenilsonRamirez/Divergence-Meter/main/final.png"
+  },
+  {
+    "title": "Wordclock",
+    "author": "Meph1sto666",
+    "download": "https://github.com/Meph1sto666/Wordclock/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "preview": "https://raw.githubusercontent.com/Meph1sto666/Wordclock/main/wordclock.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Meph1sto666/Wordclock/main/wordclock.png"
+  },
+  {
+    "title": "Legendary Cursor",
+    "author": "jasimalrawie",
+    "download": "https://github.com/JasimAlrawie/legendary-cursor-lively-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Interactive",
+    "preview": "https://raw.githubusercontent.com/JasimAlrawie/legendary-cursor-lively-wallpaper/main/prev.png",
+    "thumbnail": "https://raw.githubusercontent.com/JasimAlrawie/legendary-cursor-lively-wallpaper/main/prev.png"
+  },
+  {
+    "title": "Looking At Something",
+    "author": "Rafaël Rozendaal & Reinier Feijen",
+    "download": "https://github.com/lucifer5051/lookingatsomething-clone/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Interactive",
+    "preview": "https://raw.githubusercontent.com/lucifer5051/lookingatsomething-clone/main/thumbnail.png",
+    "thumbnail": "https://raw.githubusercontent.com/lucifer5051/lookingatsomething-clone/main/thumbnail.png"
+  },
+  {
+    "title": "Parallax Layers",
+    "author": "Lihu0",
+    "download": "https://github.com/Lihu0/LivelyParallax/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Interactive",
+    "preview": "https://raw.githubusercontent.com/Lihu0/LivelyParallax/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Lihu0/LivelyParallax/main/thumbnail.jpg"
+  },
+  {
+    "title": "Agartha",
+    "author": "Firpis",
+    "download": "https://github.com/Firpis/lively-wallpaper-agartha/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/Firpis/lively-wallpaper-agartha/main/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Firpis/lively-wallpaper-agartha/main/lively_t.jpg"
+  },
+  {
+    "title": "Anthro Fox",
+    "author": "Kitsunesaki Mezumona",
+    "download": "https://github.com/mezum/lively-anthro-fox-in-forest/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/mezum/lively-anthro-fox-in-forest/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/mezum/lively-anthro-fox-in-forest/main/thumbnail.jpg"
+  },
+  {
+    "title": "Pup In A Rug",
+    "author": "nullbyte",
+    "download": "https://github.com/nullbytenet/Pug-In-A-Rug/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/nullbytenet/Pug-In-A-Rug/main/preview.png",
+    "thumbnail": "https://raw.githubusercontent.com/nullbytenet/Pug-In-A-Rug/main/thumbnail.png"
+  },
+  {
+    "title": "Sternennacht",
+    "author": "Firpis",
+    "download": "https://github.com/Firpis/lively-wallpaper-sternennacht/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/Firpis/lively-wallpaper-sternennacht/main/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Firpis/lively-wallpaper-sternennacht/main/lively_t.jpg"
+  },
+  {
+    "title": "White Oak",
+    "author": "sukundev",
+    "download": "https://github.com/SukunDev/white-oak/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/SukunDev/white-oak/main/previews.gif",
+    "thumbnail": "https://raw.githubusercontent.com/SukunDev/white-oak/main/thumbnails.png"
+  },
+  {
+    "title": "Susuwatari Soot Sprites",
+    "author": "Kaizonaro",
+    "download": "https://github.com/zonaro/susuwatari/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/zonaro/susuwatari/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/zonaro/susuwatari/main/preview.gif"
+  },
+  {
+    "title": "The Great Wave",
+    "author": "cayan025",
+    "download": "https://github.com/cayan025/LivelyWPWaves/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/cayan025/LivelyWPWaves/master/vdk2usvc.l0c.gif",
+    "thumbnail": "https://raw.githubusercontent.com/cayan025/LivelyWPWaves/master/nvb0ffh5.byp.jpg"
+  },
+  {
+    "title": "Hyperspace",
+    "author": "haroq",
+    "download": "https://github.com/orah-q/hyperspace_lively_wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Space",
+    "thumbnail": "https://raw.githubusercontent.com/orah-q/hyperspace_lively_wallpaper/main/thumbnail.svg"
+  },
+  {
+    "title": "Console",
+    "author": "Belyanchik",
+    "download": "https://github.com/Belyanchik/liveWallpaper-console/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/Belyanchik/liveWallpaper-console/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Belyanchik/liveWallpaper-console/main/screenshot.png"
+  },
+  {
+    "title": "Cursed Matrix",
+    "author": "Luck_millooney",
+    "download": "https://github.com/luckMillooney/Lively_Cursed_Wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/luckMillooney/Lively_Cursed_Wallpaper/main/uyilr1xu.gif",
+    "thumbnail": "https://raw.githubusercontent.com/luckMillooney/Lively_Cursed_Wallpaper/main/yzqrhvlx.jpg"
+  },
+  {
+    "title": "Focus",
+    "author": "MartinK",
+    "download": "https://github.com/01-MartinK/Focus/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/01-MartinK/Focus/main/n532k4rd.gif",
+    "thumbnail": "https://raw.githubusercontent.com/01-MartinK/Focus/main/ibwgxupe.jpg"
+  },
+  {
+    "title": "Focus Mode",
+    "author": "Tarık366",
+    "download": "https://github.com/Tarik366/focus-lively/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/Tarik366/focus-lively/main/thumbnail.png",
+    "thumbnail": "https://raw.githubusercontent.com/Tarik366/focus-lively/main/thumbnail.png"
+  },
+  {
+    "title": "Kaspersky Cybermap",
+    "author": "Kaspersky",
+    "download": "https://github.com/ultropia/kasmaplwp/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/ultropia/kasmaplwp/main/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/ultropia/kasmaplwp/main/lively_t.jpg"
+  },
+  {
+    "title": "Lain System Dashboard",
+    "author": "Patrick Piña",
+    "download": "https://github.com/LU5e/lain-system-dashboard/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/LU5e/lain-system-dashboard/main/u1ez0cri.bgs.gif",
+    "thumbnail": "https://raw.githubusercontent.com/LU5e/lain-system-dashboard/main/0n0vphi1.1lg.jpg"
+  },
+  {
+    "title": "Lively Kanji",
+    "author": "Jirka",
+    "download": "https://github.com/KanjiBase/LivelyKanji/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "thumbnail": "https://raw.githubusercontent.com/KanjiBase/LivelyKanji/master/thumbnail.png"
+  },
+  {
+    "title": "Matrix (Fettah)",
+    "author": "Fettah",
+    "download": "https://github.com/mhd-fettah/lively-wallpapers-matrix-laravel/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/mhd-fettah/lively-wallpapers-matrix-laravel/master/preview2.gif",
+    "thumbnail": "https://raw.githubusercontent.com/mhd-fettah/lively-wallpapers-matrix-laravel/master/thumbnail.jpg"
+  },
+  {
+    "title": "Matrix Rain",
+    "author": "parambirs / khuong",
+    "download": "https://github.com/IAteMinecraft/Lively-Wallpaper---Matrix-Redone/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/IAteMinecraft/Lively-Wallpaper---Matrix-Redone/main/preview2.gif",
+    "thumbnail": "https://raw.githubusercontent.com/IAteMinecraft/Lively-Wallpaper---Matrix-Redone/main/thumbnail.jpg"
+  },
+  {
+    "title": "Matrix Rain (RU)",
+    "author": "parambirs / khuong",
+    "download": "https://github.com/MarasCooper/rus-matrix-lively/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/MarasCooper/rus-matrix-lively/main/preview2.gif",
+    "thumbnail": "https://raw.githubusercontent.com/MarasCooper/rus-matrix-lively/main/thumbnail.jpg"
+  },
+  {
+    "title": "MT17",
+    "author": "moein8668",
+    "download": "https://github.com/moein8668-git/mt17-lively-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "thumbnail": "https://raw.githubusercontent.com/moein8668-git/mt17-lively-wallpaper/main/thumbnail.jpg"
+  },
+  {
+    "title": "Quotes",
+    "author": "Maslov Nikolay",
+    "download": "https://github.com/tnimas/QuotesWidget/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "thumbnail": "https://raw.githubusercontent.com/tnimas/QuotesWidget/main/thumbnail.jpg"
+  },
+  {
+    "title": "System Info",
+    "author": "nudred",
+    "download": "https://github.com/nudred/lively-wallpaper-system-info/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/nudred/lively-wallpaper-system-info/main/lively_p.jpg",
+    "thumbnail": "https://raw.githubusercontent.com/nudred/lively-wallpaper-system-info/main/lively_t.jpg"
+  },
+  {
+    "title": "Parallax Template",
+    "author": "CatWater",
+    "download": "https://github.com/CatWaterCodes/LivelyWallpaperParallaxTemplate/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Interactive",
+    "preview": "https://raw.githubusercontent.com/CatWaterCodes/LivelyWallpaperParallaxTemplate/main/preview.gif"
+  },
+  {
+    "title": "The Square",
+    "author": "OMEGA",
+    "download": "https://github.com/0ME9A/the-square-animation/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/0ME9A/the-square-animation/main/lively_g.gif",
+    "thumbnail": "https://raw.githubusercontent.com/0ME9A/the-square-animation/main/lively_p.jpg"
+  },
+  {
+    "title": "Simple Widget",
+    "author": "Alwaz1143",
+    "download": "https://github.com/Alwaz1143/simple-widget-wallpaper/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/Alwaz1143/simple-widget-wallpaper/master/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Alwaz1143/simple-widget-wallpaper/master/thumbnail.jpg"
+  },
+  {
+    "title": "Neon Sign",
+    "author": "Joansiitoh",
+    "download": "https://github.com/Joansitoh/lively-neon-sign/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/Joansitoh/lively-neon-sign/main/assets/preview.jpeg",
+    "thumbnail": "https://raw.githubusercontent.com/Joansitoh/lively-neon-sign/main/assets/preview.jpeg"
+  },
+  {
+    "title": "Ribbon",
+    "author": "Boris Šehovac",
+    "download": "https://github.com/IXPLOUSEK/wallpapercopy/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Abstract",
+    "preview": "https://raw.githubusercontent.com/IXPLOUSEK/wallpapercopy/main/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/IXPLOUSEK/wallpapercopy/main/lively_t.jpg"
+  },
+  {
+    "title": "Gunnm",
+    "author": "Miklfe",
+    "download": "https://github.com/Miklfe/Gunnm_V2/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Anime",
+    "preview": "https://raw.githubusercontent.com/Miklfe/Gunnm_V2/main/GunnmV2.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Miklfe/Gunnm_V2/main/GunnmV2.jpg"
+  },
+  {
+    "title": "Rhythm Paradise",
+    "author": "Benjamin Widawski",
+    "download": "https://github.com/Pimeko/RhythmParadiseLively/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Anime",
+    "preview": "https://raw.githubusercontent.com/Pimeko/RhythmParadiseLively/master/thumbnail.png",
+    "thumbnail": "https://raw.githubusercontent.com/Pimeko/RhythmParadiseLively/master/thumbnail.png"
+  },
+  {
+    "title": "Clock of Clocks",
+    "author": "Flufiku",
+    "download": "https://github.com/Flufiku/Clock-of-Clocks/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "preview": "https://raw.githubusercontent.com/Flufiku/Clock-of-Clocks/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Flufiku/Clock-of-Clocks/main/thumbnail.jpg"
+  },
+  {
+    "title": "Ringclock",
+    "author": "Meph1sto666",
+    "download": "https://github.com/Meph1sto666/Ringclock/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "preview": "https://raw.githubusercontent.com/Meph1sto666/Ringclock/main/ringclock.gif",
+    "thumbnail": "https://raw.githubusercontent.com/Meph1sto666/Ringclock/main/ringclock.png"
+  },
+  {
+    "title": "Minimal Clock",
+    "author": "Claudio Menegotto",
+    "download": "https://github.com/Mene-hub/Minimal-clock-animated-background/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "thumbnail": "https://raw.githubusercontent.com/Mene-hub/Minimal-clock-animated-background/main/wallpaper.png"
+  },
+  {
+    "title": "Animated Clock",
+    "author": "Den4MD",
+    "download": "https://github.com/den4md/Animated-Clock-Wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "preview": "https://raw.githubusercontent.com/den4md/Animated-Clock-Wallpaper/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/den4md/Animated-Clock-Wallpaper/main/thumbnail.jpg"
+  },
+  {
+    "title": "The 25th Hour",
+    "author": "Louis Coyle",
+    "download": "https://github.com/nova-tran/kacd5e01.o2u/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Clock",
+    "thumbnail": "https://raw.githubusercontent.com/nova-tran/kacd5e01.o2u/master/2qymozhb.jpg"
+  },
+  {
+    "title": "My Dear Panda",
+    "author": "hamidtech",
+    "download": "https://github.com/hamidtech/3d-wallpaper-panda/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/hamidtech/3d-wallpaper-panda/main/skekeomj.gif",
+    "thumbnail": "https://raw.githubusercontent.com/hamidtech/3d-wallpaper-panda/main/p2bx0bfe.jpg"
+  },
+  {
+    "title": "Sakura",
+    "author": "linuxaddict89",
+    "download": "https://github.com/ekoputrapratama/lively-sakura/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/ekoputrapratama/lively-sakura/master/lively_p.gif"
+  },
+  {
+    "title": "Raindash",
+    "author": "helloworld3200",
+    "download": "https://github.com/helloworld3200/raindash/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/helloworld3200/raindash/master/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/helloworld3200/raindash/master/thumbnail.jpg"
+  },
+  {
+    "title": "Lighthouse",
+    "author": "Yoichi Kobayashi",
+    "download": "https://github.com/wizzywusky/Lighthouse-Wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "Nature",
+    "preview": "https://raw.githubusercontent.com/wizzywusky/Lighthouse-Wallpaper/main/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/wizzywusky/Lighthouse-Wallpaper/main/lively_t.jpg"
+  },
+  {
+    "title": "Starfield",
+    "author": "Vincent Maglione",
+    "download": "https://github.com/sammyyakk/starfield/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "Space",
+    "preview": "https://raw.githubusercontent.com/sammyyakk/starfield/master/lively_p.gif",
+    "thumbnail": "https://raw.githubusercontent.com/sammyyakk/starfield/master/lively_t.jpg"
+  },
+  {
+    "title": "Code Cheat Sheet",
+    "author": "JumpCraft",
+    "download": "https://github.com/JumpCraft08/Code-Cheat-Sheet/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/JumpCraft08/Code-Cheat-Sheet/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/JumpCraft08/Code-Cheat-Sheet/main/thumbnail.jpg"
+  },
+  {
+    "title": "Realtime Globe",
+    "author": "Jongmin Lee",
+    "download": "https://github.com/chunzhi23/realtime-globe-wallpaper/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/chunzhi23/realtime-globe-wallpaper/main/lively_t.jpg",
+    "thumbnail": "https://raw.githubusercontent.com/chunzhi23/realtime-globe-wallpaper/main/lively_t.jpg"
+  },
+  {
+    "title": "Matrix Rain Reimagined",
+    "author": "Galib Jaman",
+    "download": "https://github.com/MrShadow03/Matrix-Rain-Reimagined/archive/refs/heads/main.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/MrShadow03/Matrix-Rain-Reimagined/main/preview.gif",
+    "thumbnail": "https://raw.githubusercontent.com/MrShadow03/Matrix-Rain-Reimagined/main/thumbnail.png"
+  },
+  {
+    "title": "Prayer Times",
+    "author": "BuiltDifferent",
+    "download": "https://github.com/i2pacg/bd-always-prayer/archive/refs/heads/master.zip",
+    "license": "Open · see package",
+    "category": "System",
+    "preview": "https://raw.githubusercontent.com/i2pacg/bd-always-prayer/master/assets/preview/preview.jpg",
+    "thumbnail": "https://raw.githubusercontent.com/i2pacg/bd-always-prayer/master/assets/preview/thumbnail.jpg"
+  }
+]

@@ -75,7 +75,10 @@ enum LivelyValue: Codable, Hashable {
     }
 }
 
-/// One entry in `LivelyProperties.json` (a slider, color, dropdown, checkbox, textbox…).
+/// One entry in `LivelyProperties.json` (a slider, color, dropdown, folderDropdown, checkbox,
+/// textbox, button or label). Decoding is field-by-field lenient: Lively tolerates odd values
+/// (e.g. a string "5" for a slider, an array where a scalar is expected), so one quirky field
+/// must not throw away the whole entry.
 struct LivelyProperty: Codable, Hashable {
     var type: String
     var text: String?
@@ -85,10 +88,46 @@ struct LivelyProperty: Codable, Hashable {
     var step: Double?
     var items: [String]?
     var help: String?
+    /// folderDropdown: package-relative folder whose files are offered, and a filter like "*.jpg|*.png".
+    var folder: String?
+    var filter: String?
 
     enum CodingKeys: String, CodingKey {
-        case type, text, value, min, max, step, items, help
+        case type, text, value, min, max, step, items, help, folder, filter
     }
+
+    init(type: String, text: String? = nil, value: LivelyValue? = nil, min: Double? = nil,
+         max: Double? = nil, step: Double? = nil, items: [String]? = nil, help: String? = nil,
+         folder: String? = nil, filter: String? = nil) {
+        self.type = type; self.text = text; self.value = value; self.min = min; self.max = max
+        self.step = step; self.items = items; self.help = help; self.folder = folder; self.filter = filter
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Lively matches types case-insensitively ("Slider", "folderdropdown" occur in the wild).
+        let raw = ((try? c.decode(String.self, forKey: .type)) ?? "").lowercased()
+        type = raw == "folderdropdown" ? "folderDropdown" : raw
+        text = try? c.decode(String.self, forKey: .text)
+        value = try? c.decode(LivelyValue.self, forKey: .value)
+        min = Self.number(c, .min)
+        max = Self.number(c, .max)
+        step = Self.number(c, .step)
+        items = try? c.decode([String].self, forKey: .items)
+        help = try? c.decode(String.self, forKey: .help)
+        folder = try? c.decode(String.self, forKey: .folder)
+        filter = try? c.decode(String.self, forKey: .filter)
+    }
+
+    private static func number(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Double? {
+        if let d = try? c.decode(Double.self, forKey: key) { return d }
+        if let s = try? c.decode(String.self, forKey: key) { return Double(s) }
+        return nil
+    }
+
+    /// Types that are actions/decoration, not values - never sent on load (a button's "value" is
+    /// its caption; sending it would "press" the button).
+    var isValueless: Bool { type == "button" || type == "label" }
 }
 
 typealias LivelyProperties = [String: LivelyProperty]

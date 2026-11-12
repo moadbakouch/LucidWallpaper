@@ -2,23 +2,99 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+/// Main-window sidebar target. The browser holds only the wallpaper Library + Store; Settings now
+/// lives in its own window (opened from the menu bar), so it's intentionally absent here.
+enum SettingsNav: Hashable {
+    case videos, interactive, widgets, create, store
+
+    var tab: String {
+        switch self {
+        case .videos: return "videos"
+        case .interactive: return "interactive"
+        case .widgets: return "widgets"
+        case .create: return "create"
+        case .store: return "store"
+        }
+    }
+    init(tab: String) {
+        switch tab {
+        case "interactive": self = .interactive
+        case "widgets": self = .widgets
+        case "create": self = .create
+        case "store": self = .store
+        default: self = .videos
+        }
+    }
+}
+
+/// The main browser window: an Apple Music-style translucent sidebar (Library + Store) over a
+/// glass background (the desktop / live wallpaper shows through).
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var nav: SettingsNav? = SettingsNav(tab: ProcessInfo.processInfo.environment["LUCIDWALL_TAB"] ?? "videos")
+    // Bound so we can re-open the sidebar after the user collapses it (dragging the divider shut
+    // otherwise strands them with no way back — there's no built-in toggle on this custom window).
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        TabView(selection: $model.settingsTab) {
-            WallpaperGridView(kind: .video)
-                .tabItem { Label("Videos", systemImage: "film") }.tag("videos")
-            WallpaperGridView(kind: .web)
-                .tabItem { Label("Interactive", systemImage: "globe") }.tag("interactive")
-            StoreView()
-                .tabItem { Label("Store", systemImage: "bag") }.tag("store")
-            GeneralView()
-                .tabItem { Label("Settings", systemImage: "gearshape") }.tag("settings")
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            List(selection: $nav) {
+                Section("Library") {
+                    Label("Videos", systemImage: "film").tag(SettingsNav.videos)
+                    Label("Interactive", systemImage: "globe").tag(SettingsNav.interactive)
+                    Label("Widgets", systemImage: "square.topthird.inset.filled").tag(SettingsNav.widgets)
+                }
+                Section("Make & Discover") {
+                    Label("Create", systemImage: "paintbrush.pointed").tag(SettingsNav.create)
+                    Label("Store", systemImage: "bag").tag(SettingsNav.store)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .glassSidebarBackground()
+            .navigationSplitViewColumnWidth(min: 196, ideal: 216, max: 260)
+        } detail: {
+            detail
         }
-        .frame(minWidth: 680, minHeight: 520)
+        .navigationSplitViewStyle(.balanced)
+        .glassWindowBackground()
+        .frame(minWidth: 720, minHeight: 500)
+        // A sidebar toggle pinned in the top-leading chrome (like Claude desktop / Finder), so the
+        // sidebar can always be brought back after it's been collapsed.
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: toggleSidebar) {
+                    Image(systemName: "sidebar.leading")
+                }
+                .help("Show or hide the sidebar")
+                .keyboardShortcut("s", modifiers: [.command, .control])
+            }
+        }
         // Drag a .zip / Lively folder / video / image onto the window to add it.
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in handleDrop(providers) }
+        // Keep the sidebar selection and the menu-bar-driven `settingsTab` in sync (ignore "settings",
+        // which now opens the separate Settings window instead of a tab here).
+        .onChange(of: model.settingsTab) { _, tab in
+            if tab != "settings", nav?.tab != tab { nav = SettingsNav(tab: tab) }
+        }
+        .onChange(of: nav) { _, n in if let n, model.settingsTab != n.tab { model.settingsTab = n.tab } }
+    }
+
+    @ViewBuilder private var detail: some View {
+        switch nav ?? .videos {
+        case .videos: WallpaperGridView(kind: .video)
+        case .interactive: WallpaperGridView(kind: .web)
+        case .widgets: WidgetsPage()
+        case .create: CreatorView()
+        case .store: StoreView()
+        }
+    }
+
+    /// Collapse the sidebar if it's showing, otherwise bring it back. `.balanced` reports a hidden
+    /// sidebar as `.detailOnly`, so anything that isn't `.detailOnly` is treated as "currently shown".
+    private func toggleSidebar() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            columnVisibility = (columnVisibility == .detailOnly) ? .all : .detailOnly
+        }
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
@@ -41,20 +117,20 @@ struct SettingsView: View {
             if FileManager.default.fileExists(atPath: url.appendingPathComponent("LivelyInfo.json").path) {
                 try? model.importLively(at: url)
             } else {
-                model.apply(.slideshow(folder: url), addToLibrary: true)
+                model.applyToAllDisplays(.slideshow(folder: url), addToLibrary: true)
             }
         } else if ext == "zip" {
             try? model.importLively(at: url)
         } else if ext == "gif" {
-            model.apply(WallpaperItem(title: title, kind: .gif, contentURL: url), addToLibrary: true)
+            model.applyToAllDisplays(WallpaperItem(title: title, kind: .gif, contentURL: url), addToLibrary: true)
         } else if ["mp4", "mov", "m4v", "webm", "mkv", "avi", "wmv"].contains(ext) {
-            model.apply(WallpaperItem(title: title, kind: .video, contentURL: url), addToLibrary: true)
+            model.applyToAllDisplays(WallpaperItem(title: title, kind: .video, contentURL: url), addToLibrary: true)
         } else if WallpaperGridView.imageExtensions.contains(ext) {
-            model.apply(WallpaperItem(title: title, kind: .image, contentURL: url), addToLibrary: true)
+            model.applyToAllDisplays(WallpaperItem(title: title, kind: .image, contentURL: url), addToLibrary: true)
         } else if ext == "html" || ext == "htm" {
-            model.apply(WallpaperItem(title: title, kind: .web, contentURL: url), addToLibrary: true)
+            model.applyToAllDisplays(WallpaperItem(title: title, kind: .web, contentURL: url), addToLibrary: true)
         } else if ext == "metal" {
-            model.apply(WallpaperItem(title: title, kind: .shader, contentURL: url), addToLibrary: true)
+            model.applyToAllDisplays(WallpaperItem(title: title, kind: .shader, contentURL: url), addToLibrary: true)
         }
     }
 }
