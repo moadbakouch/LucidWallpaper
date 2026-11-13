@@ -7,8 +7,8 @@ import AppKit
 /// NOTE: full *automatic* update installation (Sparkle) additionally needs a Developer ID,
 /// EdDSA signing keys, and a hosted appcast - see scripts/package.sh for the notarized build.
 enum UpdateChecker {
-    /// Where the appcast JSON lives. Replace with your real hosted URL.
-    static let feedURL = URL(string: "https://raw.githubusercontent.com/lucidityyy0/LucidWallpaper/main/appcast.json")
+    /// Where the appcast JSON lives: `appcast.json` at the root of the public repo.
+    static let feedURL = URL(string: "https://raw.githubusercontent.com/moadbakouch/LucidWallpaper/main/appcast.json")
 
     static var currentVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"

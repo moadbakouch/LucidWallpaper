@@ -11,8 +11,8 @@ settings:
     SWIFT_VERSION: "5.0"
     ARCHS: arm64
     ONLY_ACTIVE_ARCH: YES
-    MARKETING_VERSION: "0.4.0"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "0.5.0"
+    CURRENT_PROJECT_VERSION: "5"
     CODE_SIGN_IDENTITY: "-"          # ad-hoc signing for local development
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: ""

@@ -168,11 +168,11 @@ enum Gallery {
         return retired.contains(key)
     }
 
-    /// Default public catalog feed — a Gist you own. Edit that Gist to add/remove/reorder
-    /// wallpapers and every user sees it the next time they open the Store; no app update needed.
+    /// Default public catalog feed: `gallery.json` at the root of the repo. Edit it to
+    /// add/remove/reorder wallpapers and every user sees it the next time they open the Store.
     /// `curated` (above) is the offline baseline the feed is merged onto.
     static let defaultFeedURL =
-        "https://gist.githubusercontent.com/lucidityyy0/8cc6c6fb24a406520c59687c2d02438b/raw/gallery.json"
+        "https://raw.githubusercontent.com/moadbakouch/LucidWallpaper/main/gallery.json"
 
     /// The feed URL: `LUCIDWALL_GALLERY_FEED` overrides it (set it empty to force the bundled set,
     /// e.g. for offline/deterministic tests); otherwise the default Gist above.

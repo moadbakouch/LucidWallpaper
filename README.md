@@ -6,9 +6,18 @@ Compatible with [Lively Wallpaper](https://github.com/rocksdanister/lively) pack
 built-in Store and a Creator for making your own.
 
 - **Requires:** Apple Silicon, macOS 14 or later (built and tested on macOS 26 Tahoe).
-- **Download:** see [Releases](../../releases). The app is ad-hoc signed, not notarized. On
-  first launch, right-click the app and choose **Open**, or run
-  `xattr -dr com.apple.quarantine /Applications/LucidWallpaper.app`.
+- **Download:** [LucidWallpaper.dmg](https://github.com/moadbakouch/LucidWallpaper/releases/latest/download/LucidWallpaper.dmg)
+  (latest release). What changed in each version: [CHANGELOG.md](CHANGELOG.md).
+
+### Install
+
+1. Open `LucidWallpaper.dmg` and drag **LucidWallpaper** to Applications.
+2. The app is ad-hoc signed, not notarized, so macOS blocks the first launch. Either open it
+   once, then go to **System Settings ▸ Privacy & Security** and click **Open Anyway**, or run:
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/LucidWallpaper.app
+   ```
+3. LucidWallpaper lives in the menu bar. A short setup picks your first wallpaper.
 
 ## Features
 
@@ -111,3 +120,7 @@ Bundled videos are from [Coverr](https://coverr.co) (free for commercial use); s
 `BundledWallpapers/videos/CREDITS.txt`. Store wallpapers are open packages by their authors,
 downloaded from their own GitHub repositories. Inspired by
 [Lively Wallpaper](https://github.com/rocksdanister/lively) by rocksdanister.
+
+## License
+
+[MIT](LICENSE). Bundled videos and Store wallpapers keep their own licenses (see Credits).
