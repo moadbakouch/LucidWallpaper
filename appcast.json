@@ -1,5 +1,5 @@
 {
-  "version": "0.5.1",
+  "version": "0.5.2",
   "downloadURL": "https://github.com/moadbakouch/LucidWallpaper/releases/latest/download/LucidWallpaper.dmg",
-  "notes": "The app is now named Lucid Wallpaper. Also in 0.5: a redesigned library, Store and Settings, and an animated first-run setup with sound."
+  "notes": "A stability fix for the main window. Also in 0.5: the app is now named Lucid Wallpaper, with a redesigned library, Store and Settings, and an animated first-run setup with sound."
 }

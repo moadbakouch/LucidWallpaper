@@ -18,6 +18,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func show() {
         if window == nil {
             let host = NSHostingController(rootView: SettingsView().environmentObject(model))
+            // The window's size limits are set by hand below. Letting SwiftUI also push its
+            // min/max size into window constraints caused an update-constraints loop (a crash
+            // in AppKit's display cycle) when the split view's content size changed.
+            host.sizingOptions = []
             let win = NSWindow(contentViewController: host)
             win.title = "Lucid Wallpaper"
             win.styleMask = [.titled, .closable, .miniaturizable, .resizable]

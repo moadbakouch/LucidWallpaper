@@ -3,6 +3,13 @@
 Every release of Lucid Wallpaper, newest first. Downloads are on the
 [Releases](https://github.com/moadbakouch/LucidWallpaper/releases) page.
 
+## 0.5.2 (2026-11-13): Stability
+
+- Hardened the main window and Settings against a crash that could happen while the window
+  was laying out (seen once, with the Store open). The crash could not be reproduced on
+  demand, so please report it if you still see the app quit unexpectedly.
+- Store previews no longer force the window to re-lay-out when a preview starts animating.
+
 ## 0.5.1 (2026-11-13): Now "Lucid Wallpaper"
 
 - The app is now named **Lucid Wallpaper**, with a space: in Finder, the Dock, the menu bar,

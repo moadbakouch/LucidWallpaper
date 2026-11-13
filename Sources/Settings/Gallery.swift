@@ -802,8 +802,17 @@ private struct PreviewImage: View {
 private struct AnimatedNSImage: NSViewRepresentable {
     let image: NSImage
     var animates: Bool
+    /// An image view with no intrinsic size. A stock NSImageView reports its image's pixel size,
+    /// so swapping thumbnail → GIF on hover (or a GIF advancing) invalidated layout all the way
+    /// up to the window; SwiftUI already gives this view an explicit frame.
+    final class FixedImageView: NSImageView {
+        override var intrinsicContentSize: NSSize {
+            NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+        }
+    }
+
     func makeNSView(context: Context) -> NSImageView {
-        let v = NSImageView()
+        let v = FixedImageView()
         v.imageScaling = .scaleAxesIndependently   // the SwiftUI frame is already aspect-correct
         v.imageAlignment = .alignCenter
         v.animates = animates
