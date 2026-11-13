@@ -1,5 +1,5 @@
 /**
- * LucidWallpaper feedback receiver (Google Apps Script).
+ * Lucid Wallpaper feedback receiver (Google Apps Script).
  *
  * Saves every in-app feedback report as its own Markdown file inside a Google Drive
  * folder called "Wallpaper Issues" (created automatically on the first report).
@@ -42,7 +42,7 @@ function doPost(e) {
       '# ' + category,
       '',
       '- **When:** ' + now.toISOString(),
-      '- **App:** LucidWallpaper ' + (data.appVersion || '?'),
+      '- **App:** Lucid Wallpaper ' + (data.appVersion || '?'),
       '- **System:** ' + (data.system || '?'),
       '- **From:** ' + (data.email ? data.email : '(not provided)'),
       '- **Wallpaper:** ' + (data.wallpaper || '(none)'),
@@ -62,7 +62,7 @@ function doPost(e) {
 
 /** A GET on the URL is handy to confirm the deployment is live. */
 function doGet() {
-  return json({ ok: true, service: 'LucidWallpaper feedback', folder: FOLDER_NAME });
+  return json({ ok: true, service: 'Lucid Wallpaper feedback', folder: FOLDER_NAME });
 }
 
 function getOrCreateFolder(name) {

@@ -79,7 +79,7 @@ struct OnboardingView: View {
                 .disabled(page == .done)
                 Spacer()
                 if page == .done {
-                    Button("Open LucidWallpaper") { onFinish() }
+                    Button("Open Lucid Wallpaper") { onFinish() }
                         .glassProminentButton().controlSize(.large).keyboardShortcut(.defaultAction)
                 } else {
                     Button("Continue") { go(to: Page(rawValue: page.rawValue + 1) ?? .done) }
@@ -104,7 +104,7 @@ private struct WelcomePage: View {
     @State private var titleIn = false
     @State private var detailsIn = false
 
-    private let name = Array("LucidWallpaper")
+    private let name = Array("Lucid Wallpaper")
 
     var body: some View {
         VStack(spacing: 0) {
@@ -152,7 +152,7 @@ private struct WelcomePage: View {
             .foregroundStyle(LinearGradient(colors: [.white, .white.opacity(0.78)], startPoint: .top, endPoint: .bottom))
             .padding(.top, 2)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("LucidWallpaper")
+            .accessibilityLabel("Lucid Wallpaper")
 
             VStack(spacing: 26) {
                 Text("Your desktop, alive. Video and interactive wallpapers\nthat stay out of the way of your battery.")
@@ -362,7 +362,7 @@ private struct ScreenSaverPage: View {
                 HStack(alignment: .top, spacing: 14) {
                     stepBadge(2, done: false)
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Choose LucidWallpaperSaver").font(.body.weight(.medium))
+                        Text("Choose Lucid Wallpaper").font(.body.weight(.medium))
                         Text("In System Settings, find it under “Other” in the screen saver list.")
                             .font(.callout).foregroundStyle(.secondary)
                         ScreenSaverPaneIllustration()
@@ -407,7 +407,7 @@ private struct ScreenSaverPage: View {
 private struct ScreenSaverPaneIllustration: View {
     var body: some View {
         HStack(spacing: 10) {
-            tile(highlight: true, label: "LucidWallpaperSaver")
+            tile(highlight: true, label: "Lucid Wallpaper")
             tile(highlight: false, label: "Drift")
             tile(highlight: false, label: "Flurry")
             Spacer(minLength: 0)
@@ -461,7 +461,7 @@ private struct DonePage: View {
 
             Text("You're all set").font(.system(size: 34, weight: .bold)).foregroundStyle(.white)
                 .padding(.top, 14)
-            Text("Your wallpaper is live. LucidWallpaper stays in the menu bar.")
+            Text("Your wallpaper is live. Lucid Wallpaper stays in the menu bar.")
                 .font(.title3).foregroundStyle(.white.opacity(0.68)).padding(.top, 6)
 
             HStack(spacing: 12) {

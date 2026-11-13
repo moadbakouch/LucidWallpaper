@@ -1,7 +1,7 @@
 import AppIntents
 import AppKit
 
-/// Siri / Shortcuts integration. These intents let users drive LucidWallpaper from the
+/// Siri / Shortcuts integration. These intents let users drive Lucid Wallpaper from the
 /// Shortcuts app, Spotlight, Focus Filters, and "Hey Siri" - applying a wallpaper, switching
 /// profiles, and pausing/resuming playback. The actions run inside the running app process and
 /// reach shared state through `AppIntentsBridge`.
@@ -82,7 +82,7 @@ enum PlaybackAction: String, AppEnum {
 
 struct ApplyWallpaperIntent: AppIntent {
     static var title: LocalizedStringResource = "Apply Wallpaper"
-    static var description = IntentDescription("Set the active LucidWallpaper wallpaper.")
+    static var description = IntentDescription("Set the active Lucid Wallpaper wallpaper.")
 
     @Parameter(title: "Wallpaper")
     var wallpaper: WallpaperEntity
@@ -102,7 +102,7 @@ struct ApplyWallpaperIntent: AppIntent {
 
 struct SelectProfileIntent: AppIntent {
     static var title: LocalizedStringResource = "Switch Profile"
-    static var description = IntentDescription("Apply a saved LucidWallpaper profile.")
+    static var description = IntentDescription("Apply a saved Lucid Wallpaper profile.")
 
     @Parameter(title: "Profile")
     var profile: ProfileEntity
@@ -176,7 +176,7 @@ struct RandomWallpaperIntent: AppIntent {
 
 // MARK: - App Shortcuts (auto-discovered phrases)
 
-/// Surfaces the intents in the Shortcuts app under "LucidWallpaper" with ready-made phrases.
+/// Surfaces the intents in the Shortcuts app under "Lucid Wallpaper" with ready-made phrases.
 /// Each phrase must contain `\(.applicationName)`.
 struct LucidWallpaperShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {

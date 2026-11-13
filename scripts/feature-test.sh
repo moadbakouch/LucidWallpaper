@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/.."
 
-APP="$HOME/Library/Caches/LucidWallpaperBuild/Build/Products/Debug/LucidWallpaper.app/Contents/MacOS/LucidWallpaper"
+APP="$HOME/Library/Caches/LucidWallpaperBuild/Build/Products/Debug/Lucid Wallpaper.app/Contents/MacOS/LucidWallpaper"
 [ -x "$APP" ] || { echo "Build first: ./scripts/build.sh"; exit 1; }
 
 SUPPORT="$HOME/Library/Application Support/LucidWallpaper"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Generate the Xcode project from project.yml and build a Debug LucidWallpaper.app.
+# Generate the Xcode project from project.yml and build a Debug "Lucid Wallpaper.app".
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,4 +19,4 @@ xcodebuild \
   -derivedDataPath "$DERIVED" \
   build
 
-echo "==> Built: $DERIVED/Build/Products/Debug/LucidWallpaper.app"
+echo "==> Built: $DERIVED/Build/Products/Debug/Lucid Wallpaper.app"

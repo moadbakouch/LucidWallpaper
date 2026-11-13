@@ -33,7 +33,7 @@ enum UpdateChecker {
         if isNewer(latest, than: currentVersion) {
             let alert = NSAlert()
             alert.messageText = "Update available - \(latest)"
-            alert.informativeText = (obj["notes"] as? String) ?? "A new version of LucidWallpaper is available."
+            alert.informativeText = (obj["notes"] as? String) ?? "A new version of Lucid Wallpaper is available."
             alert.addButton(withTitle: "Download")
             alert.addButton(withTitle: "Later")
             if alert.runModal() == .alertFirstButtonReturn,
@@ -41,7 +41,7 @@ enum UpdateChecker {
                 NSWorkspace.shared.open(url)
             }
         } else if manual {
-            info("You’re up to date", "LucidWallpaper \(currentVersion) is the latest version.")
+            info("You’re up to date", "Lucid Wallpaper \(currentVersion) is the latest version.")
         }
     }
 

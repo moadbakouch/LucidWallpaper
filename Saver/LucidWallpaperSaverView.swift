@@ -4,7 +4,7 @@ import WebKit
 import Metal
 import QuartzCore
 
-/// Screensaver that plays the user's current LucidWallpaper wallpaper. Reads the shared
+/// Screensaver that plays the user's current Lucid Wallpaper wallpaper. Reads the shared
 /// library.json from Application Support and renders video / image / web / shader content.
 final class LucidWallpaperSaverView: ScreenSaverView {
     private var player: AVQueuePlayer?

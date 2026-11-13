@@ -19,7 +19,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
                 .environmentObject(model)
             let host = NSHostingController(rootView: root)
             let win = NSWindow(contentViewController: host)
-            win.title = "Welcome to LucidWallpaper"
+            win.title = "Welcome to Lucid Wallpaper"
             // Chromeless: the aurora runs edge to edge under a transparent title bar.
             win.styleMask = [.titled, .closable, .fullSizeContentView]
             win.titlebarAppearsTransparent = true

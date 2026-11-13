@@ -429,7 +429,7 @@ struct GeneralView: View {
             HStack(spacing: 12) {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("LucidWallpaper").font(.headline)
+                    Text("Lucid Wallpaper").font(.headline)
                     Text("Version \(appVersion)").font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()

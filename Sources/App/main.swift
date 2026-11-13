@@ -5,7 +5,7 @@ import AppKit
 // lost when a harness `killall`-ed the app mid-run.
 setvbuf(stderr, nil, _IONBF, 0)
 
-// LucidWallpaper is a menu-bar agent. We drive the AppKit lifecycle directly (no storyboard,
+// Lucid Wallpaper is a menu-bar agent. We drive the AppKit lifecycle directly (no storyboard,
 // no @main App) so we have full control over window levels and activation policy.
 // The process entry point is the main thread, so we assert main-actor isolation to set up
 // our @MainActor-isolated controllers. app.run() blocks here until termination, keeping

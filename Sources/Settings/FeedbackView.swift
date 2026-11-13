@@ -64,7 +64,7 @@ struct FeedbackView: View {
     private var placeholder: String {
         switch category {
         case "Bug": return "What happened, and what did you expect? Steps to reproduce help a lot."
-        case "Idea": return "What would you like LucidWallpaper to do?"
+        case "Idea": return "What would you like Lucid Wallpaper to do?"
         default: return "Tell us anything…"
         }
     }

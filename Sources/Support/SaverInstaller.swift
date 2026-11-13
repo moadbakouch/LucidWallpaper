@@ -1,13 +1,16 @@
 import AppKit
 
-/// Installs the bundled LucidWallpaperSaver.saver into the user's Screen Savers folder and
+/// Installs the bundled "Lucid Wallpaper.saver" into the user's Screen Savers folder and
 /// opens the Screen Saver settings, so the screensaver can be enabled from inside the app.
 enum SaverInstaller {
-    static let saverName = "LucidWallpaperSaver.saver"
+    static let saverName = "Lucid Wallpaper.saver"
+    /// The saver's file name before the app was renamed; removed on (re)install so the
+    /// Screen Saver list doesn't show two entries.
+    private static let legacySaverName = "LucidWallpaperSaver.saver"
 
     /// The .saver embedded in the app bundle (Contents/Resources), if present.
     static var bundledSaver: URL? {
-        Bundle.main.url(forResource: "LucidWallpaperSaver", withExtension: "saver")
+        Bundle.main.url(forResource: "Lucid Wallpaper", withExtension: "saver")
     }
 
     static var installURL: URL {
@@ -43,6 +46,7 @@ enum SaverInstaller {
         do {
             try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
             if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
+            try? fm.removeItem(at: dest.deletingLastPathComponent().appendingPathComponent(legacySaverName))
             try fm.copyItem(at: src, to: dest)
             // Strip iCloud/Finder xattrs so the bundle loads cleanly.
             let p = Process()

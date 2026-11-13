@@ -11,7 +11,7 @@ enum ImportError: LocalizedError {
         case .noManifest:
             return "No LivelyInfo.json found in the package."
         case .unsupportedType(let t):
-            return "This wallpaper type (\(t)) isn't supported. LucidWallpaper supports video and web wallpapers."
+            return "This wallpaper type (\(t)) isn't supported. Lucid Wallpaper supports video and web wallpapers."
         case .extractionFailed(let code):
             return "Failed to extract the .zip archive (ditto exit \(code))."
         case .missingEntryFile(let name):

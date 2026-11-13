@@ -1,7 +1,17 @@
 # Changelog
 
-Every release of LucidWallpaper, newest first. Downloads are on the
+Every release of Lucid Wallpaper, newest first. Downloads are on the
 [Releases](https://github.com/moadbakouch/LucidWallpaper/releases) page.
+
+## 0.5.1 (2026-11-13): Now "Lucid Wallpaper"
+
+- The app is now named **Lucid Wallpaper**, with a space: in Finder, the Dock, the menu bar,
+  menus, Settings and the setup flow.
+- The screen saver is listed as **Lucid Wallpaper** too. If you installed it before, click
+  **Reinstall** in Settings ▸ Advanced and pick it again in System Settings; the old
+  "LucidWallpaperSaver" entry is removed for you.
+- Your library and settings carry over. If you update by hand, delete the old
+  `LucidWallpaper.app` from Applications so you don't end up with two copies.
 
 ## 0.5.0 (2026-11-13): A redesigned app
 

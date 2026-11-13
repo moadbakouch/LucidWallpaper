@@ -2,7 +2,7 @@ import AppKit
 import UniformTypeIdentifiers
 
 /// Builds the standard macOS main menu (the top-of-screen menu bar shown while the control
-/// window is open / the app is a regular app). Gives LucidWallpaper a native app feel:
+/// window is open / the app is a regular app). Gives Lucid Wallpaper a native app feel:
 /// an app menu with About/Settings/Quit, plus File, Edit, Playback and Window menus.
 extension AppDelegate {
     func setupMainMenu() {
@@ -10,18 +10,18 @@ extension AppDelegate {
 
         // App menu (titled automatically with the app name).
         let appMenu = NSMenu()
-        addAppItem(appMenu, "About LucidWallpaper", #selector(showAbout(_:)))
+        addAppItem(appMenu, "About Lucid Wallpaper", #selector(showAbout(_:)))
         addAppItem(appMenu, "Send Feedback…", #selector(sendFeedbackAction(_:)))
         appMenu.addItem(.separator())
         addAppItem(appMenu, "Settings…", #selector(showSettings(_:)), ",")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide LucidWallpaper", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Hide Lucid Wallpaper", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = appMenu.addItem(withTitle: "Hide Others",
                                          action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Quit LucidWallpaper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit Lucid Wallpaper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         addSubmenu(mainMenu, appMenu)
 
         // File - "Add your own" lives here (and via drag-and-drop onto the window); the Store tab

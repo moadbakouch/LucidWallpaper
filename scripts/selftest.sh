@@ -5,7 +5,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="/opt/homebrew/bin:$PATH"
 
-APP="$HOME/Library/Caches/LucidWallpaperBuild/Build/Products/Debug/LucidWallpaper.app/Contents/MacOS/LucidWallpaper"
+APP="$HOME/Library/Caches/LucidWallpaperBuild/Build/Products/Debug/Lucid Wallpaper.app/Contents/MacOS/LucidWallpaper"
 SUPPORT="$HOME/Library/Application Support/LucidWallpaper"
 LIB="$SUPPORT/library.json"
 PASS=0; FAIL=0

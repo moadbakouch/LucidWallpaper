@@ -19,7 +19,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         if window == nil {
             let host = NSHostingController(rootView: SettingsView().environmentObject(model))
             let win = NSWindow(contentViewController: host)
-            win.title = "LucidWallpaper"
+            win.title = "Lucid Wallpaper"
             win.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             // Integrate the SwiftUI-installed toolbar (which carries the sidebar toggle) into the
             // glass title bar instead of a separate bar below it.

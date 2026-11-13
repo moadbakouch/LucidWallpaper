@@ -1,6 +1,6 @@
 import Foundation
 
-/// Syncs LucidWallpaper's *settings* (not the wallpaper files) across your Macs via iCloud's
+/// Syncs Lucid Wallpaper's *settings* (not the wallpaper files) across your Macs via iCloud's
 /// key-value store. Library items reference local file paths that differ per machine, so only
 /// preferences are synced.
 ///

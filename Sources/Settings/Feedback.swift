@@ -76,9 +76,9 @@ enum Feedback {
         var comps = URLComponents()
         comps.scheme = "mailto"
         comps.path = contactEmail
-        let body = "\(report.message)\n\n---\n\(report.category) - LucidWallpaper \(appVersion) - macOS \(report.system)"
+        let body = "\(report.message)\n\n---\n\(report.category) - Lucid Wallpaper \(appVersion) - macOS \(report.system)"
         comps.queryItems = [
-            URLQueryItem(name: "subject", value: "LucidWallpaper Feedback - \(report.category)"),
+            URLQueryItem(name: "subject", value: "Lucid Wallpaper Feedback - \(report.category)"),
             URLQueryItem(name: "body", value: body),
         ]
         if let url = comps.url { NSWorkspace.shared.open(url) }

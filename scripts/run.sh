@@ -1,12 +1,12 @@
 #!/bin/bash
-# Build, then relaunch LucidWallpaper.app.
+# Build, then relaunch "Lucid Wallpaper.app".
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ./scripts/build.sh
 
-APP="$HOME/Library/Caches/LucidWallpaperBuild/Build/Products/Debug/LucidWallpaper.app"
+APP="$HOME/Library/Caches/LucidWallpaperBuild/Build/Products/Debug/Lucid Wallpaper.app"
 echo "==> Relaunching $APP"
 killall LucidWallpaper 2>/dev/null || true
 open "$APP"
-echo "==> LucidWallpaper is running in the menu bar (look for the photo icon)."
+echo "==> Lucid Wallpaper is running in the menu bar (look for the photo icon)."

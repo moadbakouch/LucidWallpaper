@@ -1,4 +1,4 @@
-# LucidWallpaper
+# Lucid Wallpaper
 
 Live wallpapers for macOS. Looping videos, interactive web wallpapers, Metal shaders, photos,
 GIFs and slideshows, rendered behind your desktop icons and driven from the menu bar.
@@ -11,13 +11,13 @@ built-in Store and a Creator for making your own.
 
 ### Install
 
-1. Open `LucidWallpaper.dmg` and drag **LucidWallpaper** to Applications.
+1. Open `LucidWallpaper.dmg` and drag **Lucid Wallpaper** to Applications.
 2. The app is ad-hoc signed, not notarized, so macOS blocks the first launch. Either open it
    once, then go to **System Settings ▸ Privacy & Security** and click **Open Anyway**, or run:
    ```sh
-   xattr -dr com.apple.quarantine /Applications/LucidWallpaper.app
+   xattr -dr com.apple.quarantine "/Applications/Lucid Wallpaper.app"
    ```
-3. LucidWallpaper lives in the menu bar. A short setup picks your first wallpaper.
+3. Lucid Wallpaper lives in the menu bar. A short setup picks your first wallpaper.
 
 ## Features
 
@@ -46,7 +46,7 @@ animate on macOS, plus live online image search (Wallhaven). The catalog is serv
 remote feed, so it can grow without an app update.
 
 ### macOS web runtime
-Lively wallpapers are written for Chromium on Windows. LucidWallpaper serves each package from
+Lively wallpapers are written for Chromium on Windows. Lucid Wallpaper serves each package from
 its own `lucidwp://` origin instead of `file://`, so local `fetch()`, ES modules and WebGL
 textures work. Windows paths and file-name case are normalized, dates/clocks render in
 English, and weather wallpapers get an approximate location without a permission prompt.

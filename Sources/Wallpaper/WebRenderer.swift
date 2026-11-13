@@ -151,7 +151,7 @@ extension WebRenderer: WKNavigationDelegate {
         lastCrash = now
         crashCount += 1
         guard crashCount <= 3 else {
-            NSLog("LucidWallpaper: web wallpaper keeps crashing; not reloading")
+            NSLog("Lucid Wallpaper: web wallpaper keeps crashing; not reloading")
             return
         }
         webView.reload()

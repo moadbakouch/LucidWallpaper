@@ -18,7 +18,7 @@ final class StatusBarController: NSObject {
 
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "photo.on.rectangle.angled",
-                                   accessibilityDescription: "LucidWallpaper")
+                                   accessibilityDescription: "Lucid Wallpaper")
             button.image?.isTemplate = true
         }
 
@@ -41,7 +41,7 @@ final class StatusBarController: NSObject {
     private func rebuildMenu(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        addItem(to: menu, title: "Open LucidWallpaper…", action: #selector(showLibrary))
+        addItem(to: menu, title: "Open Lucid Wallpaper…", action: #selector(showLibrary))
         menu.addItem(.separator())
 
         let header = NSMenuItem(title: model.currentItem?.title ?? "No wallpaper", action: nil, keyEquivalent: "")
@@ -72,7 +72,7 @@ final class StatusBarController: NSObject {
         menu.addItem(.separator())
         addItem(to: menu, title: "Settings…", action: #selector(showSettingsTab), key: ",")
         addItem(to: menu, title: "Send Feedback…", action: #selector(sendFeedback))
-        addItem(to: menu, title: "Quit LucidWallpaper", action: #selector(quit), key: "q")
+        addItem(to: menu, title: "Quit Lucid Wallpaper", action: #selector(quit), key: "q")
     }
 
     // MARK: Submenus (kept out of the top level to keep it uncluttered)

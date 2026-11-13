@@ -79,7 +79,7 @@ enum BuiltInWallpapers {
             guard fm.fileExists(atPath: url.path) else { return nil }
             let props = spec.properties.map { root.appendingPathComponent($0) }
             return WallpaperItem(id: spec.id, title: spec.title, kind: spec.kind,
-                                 contentURL: url, author: "LucidWallpaper",
+                                 contentURL: url, author: "Lucid Wallpaper",
                                  desc: spec.desc,
                                  propertiesURL: props.flatMap { fm.fileExists(atPath: $0.path) ? $0 : nil })
         }

@@ -235,7 +235,7 @@ enum WallpaperCreator {
     }
 
     static func writeConfigJS(_ config: CreatorConfig, to dir: URL) throws {
-        let js = "// Written by the LucidWallpaper Creator - initial values for index.html.\nwindow.LUCID_CONFIG = \(config.jsObject);\n"
+        let js = "// Written by the Lucid Wallpaper Creator - initial values for index.html.\nwindow.LUCID_CONFIG = \(config.jsObject);\n"
         try js.write(to: dir.appendingPathComponent("config.js"), atomically: true, encoding: .utf8)
     }
 
@@ -270,7 +270,7 @@ enum WallpaperCreator {
         item.contentURL = dest.appendingPathComponent("index.html")
         item.thumbnailURL = thumbURL
         item.author = "You"
-        item.desc = "Made with the LucidWallpaper Creator."
+        item.desc = "Made with the Lucid Wallpaper Creator."
         item.propertiesURL = dest.appendingPathComponent("LivelyProperties.json")
         item.category = createdCategory
         return item
@@ -281,7 +281,7 @@ enum WallpaperCreator {
 
     private static func manifest(title: String) throws -> Data {
         let info: [String: Any] = [
-            "AppVersion": "1.0.0.0", "Title": title, "Desc": "Made with the LucidWallpaper Creator.",
+            "AppVersion": "1.0.0.0", "Title": title, "Desc": "Made with the Lucid Wallpaper Creator.",
             "Author": "You", "License": "", "Contact": "", "Type": 1, "FileName": "index.html",
             "Thumbnail": "thumbnail.jpg", "Preview": "", "Arguments": "", "IsAbsolutePath": false,
         ]

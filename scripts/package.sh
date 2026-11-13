@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build a release LucidWallpaper.app and a distributable .dmg.
+# Build a release "Lucid Wallpaper.app" and a distributable .dmg.
 #
 # Ad-hoc (local) build:   ./scripts/package.sh
 # Notarized distribution: DEVELOPER_ID_APP="Developer ID Application: NAME (TEAMID)" \
@@ -11,11 +11,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="/opt/homebrew/bin:$PATH"
 
-APP_NAME="LucidWallpaper"
+APP_NAME="LucidWallpaper"          # project, scheme and DMG file name (no space: URL-friendly)
+DISPLAY_NAME="Lucid Wallpaper"     # the .app and the DMG volume
 CONFIG="Release"
 # Build outside iCloud-synced Documents (see scripts/build.sh for why).
 DERIVED="$HOME/Library/Caches/LucidWallpaperBuild-release"
-PRODUCT="$DERIVED/Build/Products/$CONFIG/$APP_NAME.app"
+PRODUCT="$DERIVED/Build/Products/$CONFIG/$DISPLAY_NAME.app"
 DIST="dist"
 DEVELOPER_ID_APP="${DEVELOPER_ID_APP:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
@@ -61,7 +62,7 @@ cp -R "$PRODUCT" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 DMG="$DIST/$APP_NAME.dmg"
 rm -f "$DMG"
-hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "$DISPLAY_NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 
 # Notarize + staple the DMG too, so the download itself passes Gatekeeper.

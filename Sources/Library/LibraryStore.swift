@@ -200,7 +200,11 @@ final class LibraryStore {
                   String(describing: error), backup.lastPathComponent)
             return
         }
-        items = decoded.items
+        // Bundled wallpapers saved before the rename carry the old one-word author credit.
+        items = decoded.items.map { item in
+            guard item.author == "LucidWallpaper" else { return item }
+            var renamed = item; renamed.author = "Lucid Wallpaper"; return renamed
+        }
         currentItemID = decoded.currentItemID
         overrides = decoded.overrides ?? [:]
         videoScalings = decoded.videoScalings ?? [:]

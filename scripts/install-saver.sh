@@ -1,12 +1,12 @@
 #!/bin/bash
-# Build LucidWallpaperSaver.saver and install it for the current user.
+# Build "Lucid Wallpaper.saver" and install it for the current user.
 # Installs to ~/Library/Screen Savers (no admin/sudo needed; reversible - just delete it).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DERIVED="$HOME/Library/Caches/LucidWallpaperBuild"
 DEST_DIR="$HOME/Library/Screen Savers"
-SAVER="$DERIVED/Build/Products/Debug/LucidWallpaperSaver.saver"
+SAVER="$DERIVED/Build/Products/Debug/Lucid Wallpaper.saver"
 
 echo "==> Generating Xcode project"
 xattr -cr Sources Resources BundledWallpapers Saver 2>/dev/null || true
@@ -24,12 +24,12 @@ xcodebuild \
 
 echo "==> Installing to $DEST_DIR"
 mkdir -p "$DEST_DIR"
-rm -rf "$DEST_DIR/LucidWallpaperSaver.saver"
+rm -rf "$DEST_DIR/Lucid Wallpaper.saver" "$DEST_DIR/LucidWallpaperSaver.saver"
 cp -R "$SAVER" "$DEST_DIR/"
 # Strip iCloud/Finder xattrs so the bundle loads cleanly.
-xattr -cr "$DEST_DIR/LucidWallpaperSaver.saver" 2>/dev/null || true
+xattr -cr "$DEST_DIR/Lucid Wallpaper.saver" 2>/dev/null || true
 
-echo "==> Installed: $DEST_DIR/LucidWallpaperSaver.saver"
-echo "==> Opening Screen Saver settings - pick 'LucidWallpaperSaver' under 'Other'."
+echo "==> Installed: $DEST_DIR/Lucid Wallpaper.saver"
+echo "==> Opening Screen Saver settings - pick 'Lucid Wallpaper' under 'Other'."
 open "x-apple.systempreferences:com.apple.ScreenSaver-Settings.extension" 2>/dev/null \
   || open "/System/Library/PreferencePanes/DesktopScreenEffectsPref.prefPane" 2>/dev/null || true

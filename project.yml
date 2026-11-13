@@ -11,8 +11,8 @@ settings:
     SWIFT_VERSION: "5.0"
     ARCHS: arm64
     ONLY_ACTIVE_ARCH: YES
-    MARKETING_VERSION: "0.5.0"
-    CURRENT_PROJECT_VERSION: "5"
+    MARKETING_VERSION: "0.5.1"
+    CURRENT_PROJECT_VERSION: "6"
     CODE_SIGN_IDENTITY: "-"          # ad-hoc signing for local development
     CODE_SIGN_STYLE: Manual
     DEVELOPMENT_TEAM: ""
@@ -35,7 +35,11 @@ targets:
         buildPhase: resources
     settings:
       base:
-        PRODUCT_NAME: LucidWallpaper
+        # User-visible name has a space; the executable and Swift module keep the old spelling
+        # so scripts (killall, paths inside the bundle) and the saver's class lookup still work.
+        PRODUCT_NAME: "Lucid Wallpaper"
+        EXECUTABLE_NAME: LucidWallpaper
+        PRODUCT_MODULE_NAME: LucidWallpaper
         PRODUCT_BUNDLE_IDENTIFIER: com.lucidwallpaper.app
         INFOPLIST_FILE: Resources/Info.plist
         GENERATE_INFOPLIST_FILE: NO
@@ -56,10 +60,10 @@ targets:
       - name: Embed screen saver
         basedOnDependencyAnalysis: false
         script: |
-          SAVER="$BUILT_PRODUCTS_DIR/LucidWallpaperSaver.saver"
+          SAVER="$BUILT_PRODUCTS_DIR/Lucid Wallpaper.saver"
           DEST="$CODESIGNING_FOLDER_PATH/Contents/Resources"
           if [ -d "$SAVER" ]; then
-            rm -rf "$DEST/LucidWallpaperSaver.saver"
+            rm -rf "$DEST/Lucid Wallpaper.saver" "$DEST/LucidWallpaperSaver.saver"
             /bin/cp -R "$SAVER" "$DEST/"
           fi
       # iCloud Documents sync stamps files with com.apple.FinderInfo / fileprovider
@@ -80,7 +84,9 @@ targets:
       - path: Shared
     settings:
       base:
-        PRODUCT_NAME: LucidWallpaperSaver
+        PRODUCT_NAME: "Lucid Wallpaper"       # shown in System Settings' screen saver list
+        EXECUTABLE_NAME: LucidWallpaperSaver
+        PRODUCT_MODULE_NAME: LucidWallpaperSaver
         PRODUCT_BUNDLE_IDENTIFIER: com.lucidwallpaper.saver
         INFOPLIST_FILE: Saver/Info.plist
         GENERATE_INFOPLIST_FILE: NO

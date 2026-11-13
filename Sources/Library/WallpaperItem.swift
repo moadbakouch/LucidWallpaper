@@ -1,6 +1,6 @@
 import Foundation
 
-/// The kinds of wallpaper content LucidWallpaper can render.
+/// The kinds of wallpaper content Lucid Wallpaper can render.
 enum WallpaperKind: String, Codable, Hashable {
     case video          // a looping video file (mp4/mov/m4v…)
     case web            // a local HTML/JS/WebGL wallpaper, OR a remote web page URL
