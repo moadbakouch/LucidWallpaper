@@ -7,11 +7,9 @@ struct WidgetsPage: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            OverlayControlsBar(settings: model.overlaySettings) { model.overlay.apply() }
-            Divider()
-            WallpaperGridView(kind: .web, widgetsOnly: true)
-        }
+        WallpaperGridView(
+            kind: .web, widgetsOnly: true,
+            topAccessory: AnyView(OverlayControlsBar(settings: model.overlaySettings) { model.overlay.apply() }))
     }
 }
 
@@ -23,8 +21,12 @@ private struct OverlayControlsBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "square.topthird.inset.filled").foregroundStyle(.tint)
-                Text("Desktop Widgets").font(.headline)
+                IconTile(systemName: "clock.fill", color: .indigo, size: 28)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Desktop Widgets").font(.headline)
+                    Text("Clock, date, weather and now playing, floating above your wallpaper.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
                 Spacer()
                 Toggle("", isOn: $settings.enabled)
                     .labelsHidden().toggleStyle(.switch)
@@ -44,11 +46,10 @@ private struct OverlayControlsBar: View {
                 }
                 .toggleStyle(.checkbox)
                 .font(.callout)
-            } else {
-                Text("A click-through clock / date / weather / now-playing layer above your wallpaper.")
-                    .font(.footnote).foregroundStyle(.secondary)
             }
         }
-        .padding(14)
+        .padding(16)
+        .background(DS.shape(DS.cardRadius).fill(Color.primary.opacity(0.05)))
+        .animation(DS.hover, value: settings.enabled)
     }
 }

@@ -25,7 +25,7 @@ struct PreferencesView: View {
                 .padding(.horizontal, 8).padding(.top, 8)
 
                 List(SettingsCategory.allCases, id: \.self, selection: $category) { cat in
-                    Label(cat.title, systemImage: cat.icon)
+                    Label { Text(cat.title) } icon: { IconTile(systemName: cat.tileIcon, color: cat.tint) }
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -62,7 +62,7 @@ struct SettingsSearchResults: View {
                     ForEach(matches) { entry in
                         Button { onPick(entry.category) } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: entry.category.icon).foregroundStyle(.tint).frame(width: 20)
+                                IconTile(systemName: entry.category.tileIcon, color: entry.category.tint)
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(entry.title)
                                     Text(entry.category.title).font(.caption).foregroundStyle(.secondary)
@@ -80,5 +80,30 @@ struct SettingsSearchResults: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .navigationTitle("Search")
+    }
+}
+
+extension SettingsCategory {
+    /// System Settings-style tile color for the sidebar.
+    var tint: Color {
+        switch self {
+        case .general: return .gray
+        case .playback: return .pink
+        case .displays: return .blue
+        case .energy: return .green
+        case .effects: return .purple
+        case .advanced: return .orange
+        }
+    }
+    /// Filled glyph that reads well in white on the tile.
+    var tileIcon: String {
+        switch self {
+        case .general: return "gearshape.fill"
+        case .playback: return "play.fill"
+        case .displays: return "display"
+        case .energy: return "bolt.fill"
+        case .effects: return "sparkles"
+        case .advanced: return "wrench.and.screwdriver.fill"
+        }
     }
 }

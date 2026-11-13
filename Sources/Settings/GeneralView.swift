@@ -141,6 +141,7 @@ struct GeneralView: View {
                     Text("Requires macOS 26").foregroundStyle(.secondary)
                 }
             }
+            Toggle("Interface sounds", isOn: $model.interfaceSoundsEnabled)
         }
     }
 
@@ -425,14 +426,26 @@ struct GeneralView: View {
 
     private var aboutSection: some View {
         Section("About") {
-            Button { model.requestFeedback?() } label: { Label("Send Feedback…", systemImage: "envelope") }
-            Text("LucidWallpaper \(appVersion)").font(.footnote).foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("LucidWallpaper").font(.headline)
+                    Text("Version \(appVersion)").font(.callout).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Send Feedback…") { model.requestFeedback?() }
+            }
+            Button("Replay Welcome Setup") {
+                // Settings runs app-modal; close it first so the setup window can take focus.
+                NSApp.keyWindow?.close()
+                DispatchQueue.main.async { model.requestOnboarding?() }
+            }
         }
     }
 
     private var appVersion: String {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-        return "v\(v)"
+        return v
     }
 }
 
@@ -524,6 +537,10 @@ struct SettingsEntry: Identifiable {
                       keywords: ["pause", "resume", "next", "previous", "random", "cycle", "remove"]),
         SettingsEntry(title: "Liquid Glass theme", category: .general,
                       keywords: ["glass", "theme", "appearance", "translucent", "material", "macos 26", "tahoe"]),
+        SettingsEntry(title: "Interface Sounds", category: .general,
+                      keywords: ["sound", "chime", "welcome", "audio", "ui sounds", "mute"]),
+        SettingsEntry(title: "Replay Welcome Setup", category: .general,
+                      keywords: ["welcome", "setup", "onboarding", "intro", "tour", "first run"]),
         SettingsEntry(title: "Menu Bar Color", category: .general,
                       keywords: ["menu bar", "menubar", "color", "tint", "eyedropper", "auto", "custom"]),
         SettingsEntry(title: "Menu Bar Legibility Scrim", category: .general,

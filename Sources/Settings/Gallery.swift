@@ -361,7 +361,7 @@ struct WallpaperMarketplace: View {
 
     private var isSearching: Bool { !search.trimmingCharacters(in: .whitespaces).isEmpty }
 
-    private let columns = [GridItem(.adaptive(minimum: 200, maximum: 300), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 220, maximum: 340), spacing: DS.gridSpacing)]
 
     /// Category chips: "All", every category present in the catalog, then "Downloaded" (only when
     /// something is actually downloaded, so the filter can't strand you on an empty view).
@@ -395,8 +395,7 @@ struct WallpaperMarketplace: View {
         let downloaded = downloadedIDs
         let results = filtered(downloaded)
         return VStack(spacing: 0) {
-            header(count: results.count + (isSearching ? online.count : 0))
-            Divider()
+            categoryBar
             ScrollView {
                 if results.isEmpty && online.isEmpty && !searchingOnline {
                     emptyState
@@ -411,10 +410,11 @@ struct WallpaperMarketplace: View {
             }
             .frame(maxWidth: .infinity)
         }
+        .searchable(text: $search, placement: .toolbar, prompt: "Search the Store and Wallhaven")
         .task { items = await Gallery.load() }
         .task(id: search) { await runOnlineSearch() }   // live online search, debounced
         .overlay { detailOverlay }
-        .animation(.easeInOut(duration: 0.15), value: selected)
+        .animation(DS.hover, value: selected)
         // If the last downloaded item is removed while viewing "Downloaded", fall back to "All".
         .onChange(of: model.items) { _, _ in
             if category == "Downloaded" && downloadedIDs.isEmpty { category = "All" }
@@ -422,7 +422,7 @@ struct WallpaperMarketplace: View {
     }
 
     private func cardGrid(_ list: [GalleryItem], _ downloaded: Set<String>) -> some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: DS.gridSpacing) {
             ForEach(list) { item in
                 StoreCard(item: item,
                           busy: busyID == item.id,
@@ -434,7 +434,7 @@ struct WallpaperMarketplace: View {
                           onView: { viewInLibrary(item) })
             }
         }
-        .padding(20)
+        .padding(.horizontal, DS.pagePadding).padding(.vertical, 12)
         .frame(maxWidth: .infinity)
     }
 
@@ -442,17 +442,16 @@ struct WallpaperMarketplace: View {
     @ViewBuilder private func onlineSection(_ downloaded: Set<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Image(systemName: "globe").foregroundStyle(.secondary)
-                Text("Online · Wallhaven").font(.headline)
+                Text("From Wallhaven").font(.title3.bold())
                 if searchingOnline { ProgressView().controlSize(.small) }
                 Spacer()
             }
-            .padding(.horizontal, 20).padding(.top, 4)
+            .padding(.horizontal, DS.pagePadding).padding(.top, 12)
             if online.isEmpty {
                 if !searchingOnline {
                     Text("No online results for “\(search)”.")
                         .font(.footnote).foregroundStyle(.secondary)
-                        .padding(.horizontal, 20).padding(.bottom, 12)
+                        .padding(.horizontal, DS.pagePadding).padding(.bottom, 12)
                 }
             } else {
                 cardGrid(online, downloaded)
@@ -494,48 +493,21 @@ struct WallpaperMarketplace: View {
                             onClose: { selected = nil })
                     .onTapGesture { }   // swallow taps inside the panel
             }
-            .transition(.opacity)
+            .transition(.opacity.combined(with: .scale(scale: 0.97)))
         }
     }
 
     // MARK: Header (search + category chips)
 
-    private func header(count: Int) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private var categoryBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search wallpapers", text: $search)
-                    .textFieldStyle(.plain)
-                if !search.isEmpty {
-                    Button { search = "" } label: { Image(systemName: "xmark.circle.fill") }
-                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                ForEach(categories, id: \.self) { cat in
+                    Chip(title: cat, selected: cat == category) { category = cat }
                 }
-                Text("\(count)")
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                    .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background(Capsule().fill(Color.primary.opacity(0.06)))
             }
-            .padding(8)
-            .background(RoundedRectangle(cornerRadius: 9).fill(Color.primary.opacity(0.06)))
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(categories, id: \.self) { cat in
-                        let selected = cat == category
-                        Button { category = cat } label: {
-                            Text(cat)
-                                .font(.caption.weight(.medium))
-                                .padding(.horizontal, 12).padding(.vertical, 5)
-                                .background(Capsule().fill(selected ? Color.accentColor : Color.primary.opacity(0.07)))
-                                .foregroundStyle(selected ? Color.white : Color.primary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 1)
-            }
+            .padding(.horizontal, DS.pagePadding).padding(.vertical, 10)
         }
-        .padding(.horizontal, 20).padding(.vertical, 12)
     }
 
     private var emptyState: some View {
@@ -597,39 +569,39 @@ private struct StoreCard: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 10) {
             // Static thumbnail by default; the animated GIF plays only while hovered (keeps a full
             // grid cheap). Click for a larger animated preview + details.
             Button(action: onOpen) {
-                PreviewImage(url: hovering ? (item.previewURL ?? item.thumbnailURL)
-                                           : (item.thumbnailURL ?? item.previewURL),
-                             animated: hovering)
-                    .frame(height: 130)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
-                    .overlay(alignment: .topLeading) { categoryBadge }
-                    .overlay(alignment: .topTrailing) { if inLibrary { libraryBadge } }
-                    .overlay(alignment: .bottomTrailing) { expandHint }
-                    .contentShape(Rectangle())
+                Artwork(radius: DS.cardRadius) {
+                    PreviewImage(url: hovering ? (item.previewURL ?? item.thumbnailURL)
+                                               : (item.thumbnailURL ?? item.previewURL),
+                                 animated: hovering)
+                }
+                .overlay(alignment: .topLeading) { categoryBadge }
+                .shadow(color: .black.opacity(hovering ? 0.32 : 0.14), radius: hovering ? 14 : 5, y: hovering ? 8 : 3)
+                .scaleEffect(hovering ? 1.015 : 1)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Click for a larger preview")
             .onHover { hovering = $0 }
-            VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title).font(.headline).lineLimit(1)
-                    Text("by \(item.author)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            .animation(DS.hover, value: hovering)
+
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title).font(.callout.weight(.medium)).lineLimit(1)
+                    Text(item.author).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
+                Spacer(minLength: 4)
                 controls
             }
-            .padding(12)
+            .padding(.horizontal, 4)
         }
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.05)))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.primary.opacity(0.08)))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
         .contextMenu {
             Button(action: onOpen) { Label("View Details", systemImage: "arrow.up.left.and.arrow.down.right") }
             if inLibrary {
+                Button(action: onView) { Label("View in Library", systemImage: "square.grid.2x2") }
                 Button(role: .destructive, action: onRemove) {
                     Label("Remove from Library", systemImage: "trash")
                 }
@@ -637,57 +609,35 @@ private struct StoreCard: View {
         }
     }
 
-    private var expandHint: some View {
-        Image(systemName: "arrow.up.left.and.arrow.down.right")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .padding(5)
-            .background(Circle().fill(.black.opacity(0.35)))
-            .padding(8)
-    }
-
     @ViewBuilder private var categoryBadge: some View {
         if let category = item.category {
-            Text(category)
-                .font(.caption2.weight(.semibold))
-                .padding(.horizontal, 7).padding(.vertical, 3)
-                .background(.ultraThinMaterial, in: Capsule())
-                .padding(8)
+            ArtworkBadge(text: category).padding(8)
         }
-    }
-
-    private var libraryBadge: some View {
-        Image(systemName: "checkmark.circle.fill")
-            .foregroundStyle(.white, .green)
-            .padding(8)
     }
 
     @ViewBuilder private var controls: some View {
         if busy {
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                Text("Downloading…").font(.caption).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            ProgressView().controlSize(.small).frame(height: 24)
         } else {
-            HStack(spacing: 8) {
-                Button(action: onApply) {
-                    Label("Apply", systemImage: "play.fill").frame(maxWidth: .infinity)
+            if inLibrary {
+                Button(action: onView) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 }
-                .buttonStyle(.borderedProminent)
-                if inLibrary {
-                    Button(action: onView) {
-                        Label("View in Library", systemImage: "checkmark.circle.fill").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered).tint(.green)
-                    .help("Open this wallpaper in your library to change its settings")
-                } else {
-                    Button(action: onDownload) {
-                        Label("Download", systemImage: "arrow.down").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
+                .buttonStyle(.borderless)
+                .help("In your library. Click to view it there.")
+            } else {
+                Button(action: onDownload) {
+                    Image(systemName: "arrow.down.circle")
                 }
+                .buttonStyle(.borderless)
+                .help("Download to your library")
             }
+            Button(action: onApply) {
+                Text("Apply").font(.caption.weight(.bold)).padding(.horizontal, 4)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
         }
     }
 }
@@ -714,7 +664,7 @@ private struct StoreDetail: View {
     var body: some View {
         VStack(spacing: 0) {
             PreviewImage(url: item.previewURL ?? item.thumbnailURL, animated: true)
-                .frame(height: 260)
+                .frame(height: 300)
                 .frame(maxWidth: .infinity)
                 .clipped()
                 .overlay(alignment: .topTrailing) {
@@ -729,7 +679,7 @@ private struct StoreDetail: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.title).font(.title2.bold())
-                        Text("by \(item.author)").foregroundStyle(.secondary)
+                        Text(item.author).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if let category = item.category {
@@ -780,11 +730,11 @@ private struct StoreDetail: View {
             }
             .padding(20)
         }
-        .frame(width: 540)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.primary.opacity(0.12)))
-        .shadow(color: .black.opacity(0.3), radius: 30, y: 12)
+        .frame(width: 560)
+        .background(.regularMaterial, in: DS.shape(DS.panelRadius))
+        .clipShape(DS.shape(DS.panelRadius))
+        .overlay(DS.shape(DS.panelRadius).strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.35), radius: 40, y: 16)
         .padding(40)
     }
 }
@@ -817,13 +767,21 @@ private struct PreviewImage: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color.indigo.opacity(0.35), Color.purple.opacity(0.22)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            Rectangle().fill(Color.primary.opacity(0.06))
             if let image {
-                AnimatedNSImage(image: image, animates: animated)
+                // Aspect-fill: size the image view to cover the frame, then clip the overflow.
+                GeometryReader { geo in
+                    let size = image.size
+                    let scale = size.width > 0 && size.height > 0
+                        ? max(geo.size.width / size.width, geo.size.height / size.height) : 1
+                    AnimatedNSImage(image: image, animates: animated)
+                        .frame(width: size.width * scale, height: size.height * scale)
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                }
+                .clipped()
             } else {
                 Image(systemName: "photo.on.rectangle.angled")
-                    .font(.largeTitle).foregroundStyle(.white.opacity(0.7))
+                    .font(.title).foregroundStyle(.tertiary)
             }
         }
         .task(id: url) { await load() }
@@ -846,7 +804,7 @@ private struct AnimatedNSImage: NSViewRepresentable {
     var animates: Bool
     func makeNSView(context: Context) -> NSImageView {
         let v = NSImageView()
-        v.imageScaling = .scaleProportionallyUpOrDown
+        v.imageScaling = .scaleAxesIndependently   // the SwiftUI frame is already aspect-correct
         v.imageAlignment = .alignCenter
         v.animates = animates
         v.image = image

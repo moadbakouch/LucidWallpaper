@@ -21,6 +21,9 @@ struct WallpaperGridView: View {
     let kind: WallpaperKind
     /// Widgets tab: show only widget-style wallpapers (clock / audio / system), regardless of `kind`.
     var widgetsOnly = false
+    /// Optional content pinned above the grid (the Widgets tab's overlay controls).
+    var topAccessory: AnyView?
+    @AppStorage("libraryInspectorVisible") private var showInspector = true
     @State private var selectedID: UUID?
     @State private var search = ""
     @State private var favoritesOnly = false
@@ -33,7 +36,7 @@ struct WallpaperGridView: View {
     @State private var customMenuBarOnly = false
     @State private var scrollTarget: UUID?   // set to scroll a revealed wallpaper into view
 
-    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 190, maximum: 300), spacing: DS.gridSpacing)]
 
     private var kindItems: [WallpaperItem] {
         if widgetsOnly { return model.items.filter { $0.isWidgetStyle } }
@@ -124,45 +127,31 @@ struct WallpaperGridView: View {
         typeFilter = nil; favoritesOnly = false; hasSoundOnly = false
         fromStoreOnly = false; customMenuBarOnly = false; selectedTags = []
     }
-    private func typeLabel(_ k: WallpaperKind) -> String {
-        switch k {
-        case .video: return "Video"
-        case .image: return "Image"
-        case .gif: return "GIF"
-        case .slideshow: return "Slideshow"
-        case .web: return "Web"
-        case .shader: return "Shader"
-        case .test: return "Test"
-        }
-    }
-
     static let imageExtensions = ["png", "jpg", "jpeg", "heic", "heif", "gif", "tiff", "tif", "bmp", "webp"]
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
+        Group {
             if kindItems.isEmpty {
                 emptyState
-            } else if items.isEmpty {
-                ContentUnavailableView("No matches", systemImage: "magnifyingglass",
-                                       description: Text("Nothing matches your search or filter."))
             } else {
-                // A flexible detail column (no GeometryReader - that reported stale widths mid-resize
-                // and let the detail draw over the grid). Both sides are clipped so neither can ever
-                // overflow into the other, at any window size.
-                HStack(spacing: 0) {
-                    grid
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                    Divider()
-                    detail
-                        .frame(minWidth: 260, idealWidth: 320, maxWidth: 360)
-                        .clipped()
-                }
+                grid
             }
-            Divider()
-            HStack(spacing: 10) { importControls; Spacer() }.padding(12)
+        }
+        .searchable(text: $search, placement: .toolbar, prompt: "Name, tag, or color")
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                addMenu
+                sortMenu
+                filtersMenu
+                Button { showInspector.toggle() } label: {
+                    Label("Inspector", systemImage: "sidebar.trailing")
+                }
+                .help(showInspector ? "Hide details" : "Show details")
+                .keyboardShortcut("i", modifiers: [.command, .option])
+            }
+        }
+        .inspector(isPresented: $showInspector) {
+            detail.inspectorColumnWidth(300)
         }
         .onAppear { selectedID = currentOrFirst; revealIfRequested() }
         .onChange(of: items) { _, newItems in
@@ -190,28 +179,18 @@ struct WallpaperGridView: View {
         return items.first?.id
     }
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search name, tag, or color…", text: $search).textFieldStyle(.roundedBorder)
-            sortMenu
-            filtersMenu
-        }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-    }
-
     // Sort options listed directly (checkmark on the active one) - no nested "Sort >" submenu.
     private var sortMenu: some View {
         Menu {
-            ForEach(LibrarySort.allCases) { s in
-                Button { sort = s } label: {
-                    Label(s.label, systemImage: sort == s ? "checkmark" : "")
-                }
+            Picker("Sort", selection: $sort) {
+                ForEach(LibrarySort.allCases) { Text($0.label).tag($0) }
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
         } label: {
-            Label(sort.label, systemImage: "arrow.up.arrow.down")
+            Label("Sort", systemImage: "arrow.up.arrow.down")
         }
-        .menuStyle(.borderlessButton).fixedSize()
+        .help("Sort: \(sort.label)")
     }
 
     private var filtersMenu: some View {
@@ -220,7 +199,7 @@ struct WallpaperGridView: View {
                 Picker("Type", selection: $typeFilter) {
                     Text("All Types").tag(WallpaperKind?.none)
                     ForEach(presentTypes, id: \.self) { k in
-                        Text(typeLabel(k)).tag(WallpaperKind?.some(k))
+                        Text(k.label).tag(WallpaperKind?.some(k))
                     }
                 }
                 .pickerStyle(.inline)
@@ -247,32 +226,45 @@ struct WallpaperGridView: View {
                   systemImage: activeFilterCount == 0 ? "line.3.horizontal.decrease.circle"
                                                       : "line.3.horizontal.decrease.circle.fill")
         }
-        .menuStyle(.borderlessButton).fixedSize()
+        .help(activeFilterCount == 0 ? "Filter" : "\(activeFilterCount) filter\(activeFilterCount == 1 ? "" : "s") active")
     }
 
     private var grid: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 18) {
-                    ForEach(items) { item in
-                        WallpaperCell(item: item,
-                                      isCurrent: model.currentItemID == item.id,
-                                      isSelected: selectedID == item.id)
-                            .id(item.id)
-                            .onTapGesture { selectedID = item.id }
-                            .simultaneousGesture(TapGesture(count: 2).onEnded {
-                                model.applyToAllDisplays(item)
-                            })
-                            .contextMenu {
-                                Button("Apply") { model.applyToAllDisplays(item) }
-                                if model.isCreation(item) {
-                                    Button("Edit in Creator") { model.editInCreator(item) }
+                VStack(alignment: .leading, spacing: DS.gridSpacing) {
+                    if let topAccessory { topAccessory }
+                    if items.isEmpty {
+                        ContentUnavailableView("No matches", systemImage: "magnifyingglass",
+                                               description: Text("Nothing matches your search or filter."))
+                            .frame(maxWidth: .infinity).padding(.top, 60)
+                    }
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: DS.gridSpacing) {
+                        ForEach(items) { item in
+                            WallpaperCell(item: item,
+                                          isCurrent: model.currentItemID == item.id,
+                                          isSelected: selectedID == item.id,
+                                          onApply: { model.applyToAllDisplays(item, crossfade: true) })
+                                .id(item.id)
+                                .onTapGesture { selectedID = item.id }
+                                .simultaneousGesture(TapGesture(count: 2).onEnded {
+                                    model.applyToAllDisplays(item, crossfade: true)
+                                })
+                                .contextMenu {
+                                    Button("Apply") { model.applyToAllDisplays(item, crossfade: true) }
+                                    Button(model.isFavorite(item) ? "Remove from Favorites" : "Add to Favorites") {
+                                        model.toggleFavorite(item)
+                                    }
+                                    if model.isCreation(item) {
+                                        Button("Edit in Creator") { model.editInCreator(item) }
+                                    }
+                                    Divider()
+                                    Button("Remove", role: .destructive) { remove(item) }
                                 }
-                                Button("Remove", role: .destructive) { remove(item) }
-                            }
+                        }
                     }
                 }
-                .padding(18)
+                .padding(DS.pagePadding)
             }
             // Scroll the revealed wallpaper (from the Store's "View in Library") into view.
             .onChange(of: scrollTarget) { _, target in
@@ -287,54 +279,61 @@ struct WallpaperGridView: View {
         if let id = selectedID, let item = items.first(where: { $0.id == id }) {
             WallpaperDetail(item: item, onRemoved: { remove(item) })
         } else {
-            Text("Select a wallpaper")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ContentUnavailableView("No Selection", systemImage: "photo.on.rectangle",
+                                   description: Text("Select a wallpaper to see its options."))
         }
     }
 
     @ViewBuilder private var emptyState: some View {
         ScrollView {
             VStack(spacing: 16) {
+                if let topAccessory { topAccessory.padding(.horizontal, DS.pagePadding) }
                 ContentUnavailableView {
-                    Label(kind == .video ? "No videos yet" : "No interactive wallpapers yet",
-                          systemImage: kind == .video ? "film" : "globe")
+                    Label(widgetsOnly ? "No widget wallpapers yet"
+                                      : kind == .video ? "No videos yet" : "No interactive wallpapers yet",
+                          systemImage: widgetsOnly ? "widget.small" : kind == .video ? "film" : "cursorarrow.motionlines")
                 } description: {
-                    Text(kind == .video
-                         ? "Add a video file to set it as your wallpaper."
-                         : "Import a Lively package, or try the built-in interactive sample.")
+                    Text(widgetsOnly ? "Clocks, visualizers and system monitors from the Store show up here."
+                         : kind == .video ? "Add a video or image, or drop one on this window."
+                         : "Import a Lively package, or get one from the Store.")
                 } actions: {
-                    importControls
+                    if widgetsOnly {
+                        Button("Open Store") { model.settingsTab = "store" }
+                    } else {
+                        addMenu.fixedSize()
+                    }
                 }
-                if kind != .video {
+                if kind != .video && !widgetsOnly {
                     GetWallpapersView()
                         .padding()
                         .frame(maxWidth: 460)
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.top, 24)
+            .padding(.top, DS.pagePadding)
         }
     }
 
-    @ViewBuilder private var importControls: some View {
-        switch kind {
-        case .video:
-            Button { addVideo() } label: { Label("Add Video or Image…", systemImage: "plus") }
-        default:
-            Button { importLively() } label: { Label("Import…", systemImage: "square.and.arrow.down") }
-            Menu {
-                Button("Add Shadertoy URL…") { addShadertoy() }
-                Button("Built-in Shader") { addBuiltInShader() }
-                Button("Interactive Sample") {
+    /// The toolbar's "+" - everything that adds a wallpaper to this tab.
+    private var addMenu: some View {
+        Menu {
+            if kind == .video {
+                Button { addVideo() } label: { Label("Video or Image…", systemImage: "film") }
+            } else {
+                Button { importLively() } label: { Label("Import Lively Package…", systemImage: "square.and.arrow.down") }
+                Button { addShadertoy() } label: { Label("Shadertoy URL…", systemImage: "link") }
+                Divider()
+                Button { addBuiltInShader() } label: { Label("Built-in Shader", systemImage: "wand.and.stars") }
+                Button {
                     if let item = WallpaperItem.bundledWeb("particles", title: "Particles") {
                         model.applyToAllDisplays(item, addToLibrary: true); selectedID = item.id
                     }
-                }
-            } label: { Label("Add", systemImage: "plus") }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
+                } label: { Label("Interactive Sample", systemImage: "sparkles") }
+            }
+        } label: {
+            Label("Add", systemImage: "plus")
         }
+        .help("Add a wallpaper")
     }
 
     // MARK: Actions
@@ -405,53 +404,74 @@ struct WallpaperCell: View {
     let item: WallpaperItem
     let isCurrent: Bool
     let isSelected: Bool
+    var onApply: () -> Void = {}
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Color.clear drives a reliable 16:10 box; the thumbnail fills + is clipped to it.
-            Color.clear
-                .aspectRatio(16.0 / 10.0, contentMode: .fit)
-                .overlay { ThumbnailView(item: item) }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12),
-                                      lineWidth: isSelected ? 2.5 : 1)
-                }
+        let favorite = model.isFavorite(item)
+        VStack(alignment: .leading, spacing: 8) {
+            Artwork { ThumbnailView(item: item) }
                 .overlay(alignment: .topLeading) {
-                    // Favorite star - visible on hover or when favorited.
-                    if hovering || model.isFavorite(item) {
-                        Button { model.toggleFavorite(item) } label: {
-                            Image(systemName: model.isFavorite(item) ? "star.fill" : "star")
-                                .foregroundStyle(model.isFavorite(item) ? .yellow : .white)
-                                .padding(5).shadow(radius: 1)
-                        }
-                        .buttonStyle(.plain)
+                    if isCurrent {
+                        ArtworkBadge(text: "Live", systemImage: "dot.radiowaves.left.and.right", tint: .accentColor)
+                            .padding(8)
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if isCurrent {
-                        Image(systemName: "checkmark.circle.fill")
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, .green)
-                            .padding(5)
-                            .shadow(radius: 1)
+                    // Favorite star - visible on hover or when favorited.
+                    if hovering || favorite {
+                        ArtworkIconButton(systemName: favorite ? "star.fill" : "star",
+                                          tint: favorite ? .yellow : .white) { model.toggleFavorite(item) }
+                            .help(favorite ? "Remove from Favorites" : "Add to Favorites")
+                            .padding(7)
+                            .transition(.opacity)
                     }
                 }
-                .shadow(color: .black.opacity(hovering ? 0.3 : 0), radius: hovering ? 8 : 0, y: hovering ? 4 : 0)
+                .overlay(alignment: .bottomTrailing) {
+                    if hovering && !isCurrent {
+                        Button(action: onApply) {
+                            Label("Apply", systemImage: "play.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(Capsule().fill(.ultraThinMaterial).environment(\.colorScheme, .dark))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(8)
+                        .transition(.opacity.combined(with: .offset(y: 4)))
+                    }
+                }
+                .shadow(color: .black.opacity(hovering ? 0.32 : 0.14), radius: hovering ? 14 : 5, y: hovering ? 8 : 3)
+                // Selection ring sits just outside the artwork, like Photos.
+                .padding(4)
+                .overlay {
+                    DS.shape(DS.artworkRadius + 4)
+                        .strokeBorder(Color.accentColor, lineWidth: isSelected ? 3 : 0)
+                }
 
-            Text(item.title)
-                .font(.callout)
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? Color.accentColor : .primary)
-                .padding(.horizontal, 2)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.title)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 6)
         }
-        .padding(6)
         .contentShape(Rectangle())
-        .scaleEffect(hovering ? 1.03 : 1)
-        .animation(.easeOut(duration: 0.15), value: hovering)
+        .scaleEffect(hovering ? 1.02 : 1)
+        .animation(DS.hover, value: hovering)
+        .animation(DS.hover, value: isSelected)
         .onHover { hovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    private var subtitle: String {
+        if let author = item.author, !author.isEmpty { return "\(item.kind.label) · \(author)" }
+        return item.kind.label
     }
 }
 
@@ -462,18 +482,14 @@ struct WallpaperDetail: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Color.clear
-                    .aspectRatio(16.0 / 10.0, contentMode: .fit)
-                    .overlay { ThumbnailView(item: item) }
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(.primary.opacity(0.12)) }
+            VStack(alignment: .leading, spacing: 14) {
+                Artwork { ThumbnailView(item: item) }
+                    .shadow(color: .black.opacity(0.2), radius: 10, y: 5)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title).font(.title3.bold())
-                    if let author = item.author {
-                        Text("by \(author)").font(.caption).foregroundStyle(.secondary)
-                    }
+                    Text(item.title).font(.title2.bold()).lineLimit(2)
+                    Text(item.author.map { "\(item.kind.label) · \($0)" } ?? item.kind.label)
+                        .font(.callout).foregroundStyle(.secondary)
                 }
                 if let desc = item.desc, !desc.isEmpty {
                     Text(desc).font(.callout).foregroundStyle(.secondary)
@@ -487,51 +503,60 @@ struct WallpaperDetail: View {
                         Image(systemName: model.isFavorite(item) ? "star.fill" : "star")
                             .foregroundStyle(model.isFavorite(item) ? .yellow : .secondary)
                     }
-                    .help("Favorite")
-                    Button("Remove", role: .destructive, action: onRemoved)
-                }
-                if model.isCreation(item) {
-                    Button {
-                        model.editInCreator(item)
+                    .help(model.isFavorite(item) ? "Remove from Favorites" : "Add to Favorites")
+                    Menu {
+                        if model.isCreation(item) {
+                            Button { model.editInCreator(item) } label: {
+                                Label("Edit in Creator", systemImage: "paintbrush.pointed")
+                            }
+                        }
+                        Button(role: .destructive, action: onRemoved) {
+                            Label("Remove from Library", systemImage: "trash")
+                        }
                     } label: {
-                        Label("Edit in Creator", systemImage: "paintbrush.pointed")
+                        Image(systemName: "ellipsis")
                     }
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("More")
+                    Spacer(minLength: 0)
                 }
+                .controlSize(.large)
 
                 if item.kind == .video || item.kind == .image || item.kind == .gif || item.kind == .slideshow {
-                    Divider()
-                    Text("Fit").font(.headline)
-                    VideoControlsView(item: item)
+                    block("Fit") { VideoControlsView(item: item) }
                 } else {
                     let entries = model.propertyEntries(for: item)
                     if !entries.isEmpty {
-                        Divider()
-                        HStack {
-                            Text("Customize").font(.headline)
-                            Spacer()
-                            Button { model.randomizeProperties(for: item) } label: {
-                                Label("Randomize", systemImage: "dice").labelStyle(.iconOnly)
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                SectionTitle("Customize")
+                                Spacer()
+                                Button { model.randomizeProperties(for: item) } label: {
+                                    Label("Randomize", systemImage: "dice").labelStyle(.iconOnly)
+                                }
+                                .buttonStyle(.borderless)
+                                .help("Randomize colors, speed and more")
                             }
-                            .help("Randomize colors, speed and more")
+                            PropertyControlsView(item: item, entries: entries).inspectorCard()
                         }
-                        PropertyControlsView(item: item, entries: entries)
                     }
                 }
 
-                Divider()
                 PaletteView(item: item)
-                Divider()
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Menu Bar").font(.headline)
-                    MenuBarColorPicker(item: item)
-                }
-                Divider()
-                SoundPicker(item: item)
-                Divider()
-                TagEditor(item: item)
+                block("Menu Bar") { MenuBarColorPicker(item: item) }
+                block("Ambient Sound") { SoundPicker(item: item) }
+                block("Tags") { TagEditor(item: item) }
                 Spacer(minLength: 0)
             }
-            .padding(18)
+            .padding(16)
+        }
+    }
+
+    private func block<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle(title)
+            content().inspectorCard()
         }
     }
 
@@ -543,7 +568,7 @@ struct WallpaperDetail: View {
         let screens = NSScreen.screens
         Menu {
             if screens.count > 1 {
-                Button("All Displays") { model.applyToAllDisplays(item) }
+                Button("All Displays") { model.applyToAllDisplays(item, crossfade: true) }
                 Divider()
             }
             ForEach(Array(screens.enumerated()), id: \.offset) { index, screen in
@@ -556,7 +581,7 @@ struct WallpaperDetail: View {
         } label: {
             Label(isApplied ? "Applied" : "Apply", systemImage: isApplied ? "checkmark" : "play.fill")
         } primaryAction: {
-            model.applyToAllDisplays(item)   // primary = show on all; per-display is in the menu
+            model.applyToAllDisplays(item, crossfade: true)   // primary = show on all; per-display is in the menu
         }
         .menuStyle(.button)
         .buttonStyle(.borderedProminent)
@@ -577,14 +602,15 @@ struct PaletteView: View {
     var body: some View {
         Group {
             if !colors.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Colors").font(.headline)
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionTitle("Colors")
+                    HStack(spacing: 0) {
                         ForEach(Array(colors.enumerated()), id: \.offset) { _, c in
-                            RoundedRectangle(cornerRadius: 5).fill(c).frame(width: 34, height: 24)
-                                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.primary.opacity(0.12)))
+                            Rectangle().fill(c).frame(height: 26)
                         }
                     }
+                    .clipShape(Capsule())
+                    .overlay(Capsule().strokeBorder(.primary.opacity(0.12), lineWidth: 0.5))
                 }
             }
         }
@@ -607,8 +633,6 @@ struct SoundPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Ambient Sound").font(.headline)
-
             if let url = current {
                 HStack(spacing: 6) {
                     Image(systemName: "speaker.wave.2.fill").foregroundStyle(.tint)
@@ -631,10 +655,6 @@ struct SoundPicker: View {
             Button { pickCustom() } label: { Label("Custom Sound…", systemImage: "folder") }
                 .controlSize(.small)
 
-            Text("Only one ambient sound plays at a time - the current wallpaper's - so it never "
-                 + "overlaps or differs per screen. The macOS sounds come from your system. Mute or "
-                 + "set the level from the menu bar (Sound) or Settings → Live Effects.")
-                .font(.caption).foregroundStyle(.secondary)
         }
         .id(item.id)
     }
@@ -645,7 +665,7 @@ struct SoundPicker: View {
             Text(sound.displayName)
                 .font(.caption2).lineLimit(1).minimumScaleFactor(0.85)
                 .frame(maxWidth: .infinity).padding(.vertical, 5).padding(.horizontal, 4)
-                .background(RoundedRectangle(cornerRadius: 6)
+                .background(Capsule()
                     .fill(selected ? Color.accentColor : Color.primary.opacity(0.08)))
                 .foregroundStyle(selected ? .white : .primary)
         }
@@ -670,7 +690,6 @@ struct TagEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Tags").font(.headline)
             TextField("comma, separated, tags", text: $text)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { commit() }

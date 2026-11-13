@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let feedback = FeedbackWindowController(model: model)
         feedbackWindow = feedback
         model.requestFeedback = { [weak feedback] in feedback?.show() }
+        model.requestOnboarding = { [weak self] in self?.showOnboarding() }
 
         // The global cursor feed into mouse-follow / parallax wallpapers is owned by AppModel,
         // which only enables it for interactive (web/shader) wallpapers.
@@ -47,6 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if ProcessInfo.processInfo.environment["LUCIDWALL_OPEN_SETTINGS"] != nil {
             settingsWindow.show()
+        }
+        if ProcessInfo.processInfo.environment["LUCIDWALL_OPEN_PREFS"] != nil {
+            DispatchQueue.main.async { [weak self] in self?.preferencesWindow.show() }   // modal: don't block launch
         }
 
         if let cap = ProcessInfo.processInfo.environment["LUCIDWALL_FPS_CAP"], let n = Int(cap) {

@@ -23,6 +23,13 @@ final class AppModel: ObservableObject {
     }
     var liquidGlassSupported: Bool { LiquidGlass.isSupported }
 
+    /// Chimes in the setup flow (see SoundEffects). Published so toggles stay in sync.
+    @Published var interfaceSoundsEnabled = SoundEffects.isEnabled {
+        didSet { SoundEffects.isEnabled = interfaceSoundsEnabled }
+    }
+    /// Set by the app delegate: replays the first-run setup flow.
+    var requestOnboarding: (() -> Void)?
+
     @Published private(set) var items: [WallpaperItem] = []
     @Published private(set) var currentItemID: UUID?
     @Published private(set) var isUserPaused = false

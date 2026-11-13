@@ -20,7 +20,16 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             let host = NSHostingController(rootView: root)
             let win = NSWindow(contentViewController: host)
             win.title = "Welcome to LucidWallpaper"
-            win.styleMask = [.titled, .closable]
+            // Chromeless: the aurora runs edge to edge under a transparent title bar.
+            win.styleMask = [.titled, .closable, .fullSizeContentView]
+            win.titlebarAppearsTransparent = true
+            win.titleVisibility = .hidden
+            win.isMovableByWindowBackground = true
+            win.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            win.standardWindowButton(.zoomButton)?.isHidden = true
+            win.appearance = NSAppearance(named: .darkAqua)
+            win.backgroundColor = .black
+            win.setContentSize(NSSize(width: 800, height: 620))
             win.isReleasedWhenClosed = false
             win.delegate = self
             win.center()
@@ -38,6 +47,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        guard !NSApp.windows.contains(where: { $0.isVisible && $0 !== window }) else { return }
         NSApp.setActivationPolicy(.accessory)
     }
 }

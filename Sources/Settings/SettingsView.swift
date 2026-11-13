@@ -27,8 +27,8 @@ enum SettingsNav: Hashable {
     }
 }
 
-/// The main browser window: an Apple Music-style translucent sidebar (Library + Store) over a
-/// glass background (the desktop / live wallpaper shows through).
+/// The main browser window: a translucent sidebar (library sections, Store, Create, and a
+/// now-playing card) beside the selected section, with search and actions in the toolbar.
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
     @State private var nav: SettingsNav? = SettingsNav(tab: ProcessInfo.processInfo.environment["LUCIDWALL_TAB"] ?? "videos")
@@ -40,26 +40,27 @@ struct SettingsView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $nav) {
                 Section("Library") {
-                    Label("Videos", systemImage: "film").tag(SettingsNav.videos)
-                    Label("Interactive", systemImage: "globe").tag(SettingsNav.interactive)
-                    Label("Widgets", systemImage: "square.topthird.inset.filled").tag(SettingsNav.widgets)
+                    row("Videos", "film", .videos)
+                    row("Interactive", "cursorarrow.motionlines", .interactive)
+                    row("Widgets", "widget.small", .widgets)
                 }
-                Section("Make & Discover") {
-                    Label("Create", systemImage: "paintbrush.pointed").tag(SettingsNav.create)
+                Section("Discover") {
                     Label("Store", systemImage: "bag").tag(SettingsNav.store)
+                    Label("Create", systemImage: "paintbrush.pointed").tag(SettingsNav.create)
                 }
             }
             .scrollContentBackground(.hidden)
+            .safeAreaInset(edge: .bottom, spacing: 0) { NowPlayingCard() }
             .glassSidebarBackground()
-            .navigationSplitViewColumnWidth(min: 196, ideal: 216, max: 260)
+            .navigationSplitViewColumnWidth(min: 204, ideal: 232, max: 280)
         } detail: {
             detail
         }
         .navigationSplitViewStyle(.balanced)
         .glassWindowBackground()
-        .frame(minWidth: 720, minHeight: 500)
-        // A sidebar toggle pinned in the top-leading chrome (like Claude desktop / Finder), so the
-        // sidebar can always be brought back after it's been collapsed.
+        .frame(minWidth: 860, minHeight: 540)
+        // A sidebar toggle pinned in the top-leading chrome, so the sidebar can always be brought
+        // back after it's been collapsed.
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: toggleSidebar) {
@@ -77,6 +78,29 @@ struct SettingsView: View {
             if tab != "settings", nav?.tab != tab { nav = SettingsNav(tab: tab) }
         }
         .onChange(of: nav) { _, n in if let n, model.settingsTab != n.tab { model.settingsTab = n.tab } }
+    }
+
+    /// A library row with its item count trailing (drawn by hand: `.badge` dropped the row's
+    /// selection highlight when the count changed after first layout).
+    private func row(_ title: String, _ symbol: String, _ target: SettingsNav) -> some View {
+        HStack {
+            Label(title, systemImage: symbol)
+            Spacer()
+            Text("\(count(for: target))")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.tertiary)
+        }
+        .tag(target)
+    }
+
+    /// Item counts shown as sidebar badges (same buckets the tabs themselves use).
+    private func count(for nav: SettingsNav) -> Int {
+        switch nav {
+        case .videos: return model.items.filter { [.video, .image, .gif, .slideshow].contains($0.kind) }.count
+        case .interactive: return model.items.filter { ($0.kind == .web || $0.kind == .shader) && !$0.isWidgetStyle }.count
+        case .widgets: return model.items.filter { $0.isWidgetStyle }.count
+        default: return 0
+        }
     }
 
     @ViewBuilder private var detail: some View {
@@ -135,6 +159,72 @@ struct SettingsView: View {
     }
 }
 
+/// The sidebar's footer: what's on the desktop right now, with transport controls.
+struct NowPlayingCard: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        if let item = model.currentItem, model.hasWallpaper {
+            VStack(alignment: .leading, spacing: 9) {
+                Artwork(radius: 9) { ThumbnailView(item: item) }
+                    .overlay {
+                        if model.isUserPaused {
+                            DS.shape(9).fill(.black.opacity(0.45))
+                            Image(systemName: "pause.fill").font(.title2).foregroundStyle(.white)
+                        }
+                    }
+                    .onTapGesture(count: 2) { model.revealInLibrary(item) }
+                    .help("Double-click to show in the library")
+                HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(model.isUserPaused ? "Paused" : "Now Playing")
+                            .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        Text(item.title).font(.callout.weight(.medium)).lineLimit(1)
+                    }
+                    Spacer(minLength: 4)
+                    transport(model.isUserPaused ? "play.fill" : "pause.fill",
+                              model.isUserPaused ? "Resume" : "Pause") { model.togglePause() }
+                    transport("forward.fill", "Next wallpaper") { model.cycleWallpaper(by: 1) }
+                        .disabled(model.items.count < 2)
+                }
+            }
+            .padding(9)
+            .background(DS.shape(DS.cardRadius).fill(Color.primary.opacity(0.06)))
+            .overlay(DS.shape(DS.cardRadius).strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+            .padding(10)
+            .animation(DS.hover, value: model.isUserPaused)
+        }
+    }
+
+    private func transport(_ symbol: String, _ help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(help)
+    }
+}
+
+extension WallpaperKind {
+    /// Short user-facing name ("Video", "Shader", …).
+    var label: String {
+        switch self {
+        case .video: return "Video"
+        case .image: return "Image"
+        case .gif: return "GIF"
+        case .slideshow: return "Slideshow"
+        case .web: return "Interactive"
+        case .shader: return "Shader"
+        case .test: return "Test"
+        }
+    }
+}
+
 /// A real preview of the wallpaper (video frame / web snapshot / package thumbnail / image),
 /// loaded asynchronously and cached, with a kind-appropriate placeholder while loading.
 struct ThumbnailView: View {
@@ -157,7 +247,7 @@ struct ThumbnailView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .task(id: item.id) {
             let loaded = await ThumbnailProvider.image(for: item)
             withAnimation(.easeOut(duration: 0.2)) { image = loaded }
